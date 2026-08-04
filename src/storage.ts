@@ -2,6 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ValidationError } from "./errors.js";
+import type { AgentRun } from "./agents.js";
 import type { Change, JsonValue, SkillRun } from "./models.js";
 import type { Task } from "./tasks.js";
 
@@ -16,6 +17,9 @@ export class Workspace {
   readonly tasks: string;
   readonly workspaces: string;
   readonly integrations: string;
+  readonly agents: string;
+  readonly agentRuns: string;
+  readonly agentConfig: string;
   readonly lockfile: string;
 
   constructor(root = ".cjhx") {
@@ -26,11 +30,14 @@ export class Workspace {
     this.tasks = resolve(this.root, "tasks");
     this.workspaces = resolve(this.root, "workspaces");
     this.integrations = resolve(this.root, "integrations");
+    this.agents = resolve(this.root, "agents");
+    this.agentRuns = resolve(this.root, "agent-runs");
+    this.agentConfig = resolve(this.agents, "config.json");
     this.lockfile = resolve(this.root, "skills-lock.json");
   }
 
   initialize(): void {
-    [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations].forEach((path) => mkdirSync(path, { recursive: true }));
+    [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations, this.agents, this.agentRuns].forEach((path) => mkdirSync(path, { recursive: true }));
     if (!existsSync(this.lockfile)) this.writeJson(this.lockfile, { schemaVersion: 1, skills: {} });
   }
 
@@ -67,6 +74,12 @@ export class Workspace {
   getIntegrationConfig(id: string): JsonValue { return this.readJson(this.integrationPath(id)); }
   saveIntegrationConfig(id: string, value: JsonValue): void { this.initialize(); this.writePrivateJson(this.integrationPath(id), value); }
   removeIntegrationConfig(id: string): void { rmSync(this.integrationPath(id), { force: true }); }
+  agentConfigExists(): boolean { return existsSync(this.agentConfig); }
+  getAgentConfig(): JsonValue { return this.readJson(this.agentConfig); }
+  saveAgentConfig(value: JsonValue): void { this.initialize(); this.writePrivateJson(this.agentConfig, value); }
+  saveAgentRun(run: AgentRun): void { this.initialize(); this.writePrivateJson(this.entityPath(this.agentRuns, run.id, "agent run id"), run as unknown as JsonValue); }
+  getAgentRun(id: string): AgentRun { return this.readJson(this.entityPath(this.agentRuns, id, "agent run id")) as unknown as AgentRun; }
+  listAgentRuns(): AgentRun[] { this.initialize(); return this.jsonFiles(this.agentRuns).map((path) => this.readJson(path) as unknown as AgentRun).sort((a, b) => b.startedAt.localeCompare(a.startedAt)); }
 
   private changePath(id: string): string { return this.entityPath(this.changes, id, "change id"); }
   private integrationPath(id: string): string { return this.entityPath(this.integrations, id, "integration id"); }

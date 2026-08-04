@@ -39,6 +39,8 @@ DevOps pipeline, run, artifact, and service data is read as a live projection th
 
 The Workspace Hub stores only repository references and display metadata under `.cjhx/workspaces/`. A local Workspace reads its canonical Git root and filesystem in real time. A virtual Workspace calls a configured GitLab or GitHub browser extension in real time and does not clone or persist repository trees, issues, change requests, or comments. Workspace-scoped views are projections: Overview summarizes repository health, Kanban invokes the same unified board projection as the global task-board entry with the current Workspace scope locked, Sessions projects Skill/Workflow runs, Team aggregates declared owners/assignees, and Codebase provides repository browsing.
 
+Configured development Agents form a task-execution plane beside (not inside) the platform Adapter plane. `AgentService` stores private CLI profiles under `.cjhx/agents/`, selects one default Agent, binds every execution to a concrete Task and local Workspace, builds the prompt from task context and acceptance criteria, and records private Agent Runs under `.cjhx/agent-runs/`. Claude Code, Codex, Qoder, and custom CLI names are edge configuration; lifecycle and Task contracts remain Agent-product neutral. Executable tests and runs require explicit approval and never use a shell. The local process runner is an MVP seam, not a sandbox; production deployments must replace it with an isolated worktree/container/micro-VM executor.
+
 Requirement decomposition output may be promoted into local task drafts under `.cjhx/tasks/`. Changes, tasks, and execution runs can carry `workspaceId` so Team, Kanban, and Sessions are explicitly scoped. `WorkspaceHub.board()` normalizes CJHX drafts, Jira-owned task projections, GitHub/GitLab issues, and change requests into one seven-state `BoardItem` contract. Drafts have a CJHX-owned task state machine. Publishing a draft through `JiraAdapter` transfers task authority to Jira; Jira status writes require explicit approval through `ToolBroker`. Remote issue and PR/MR items remain live read-only projections and are never copied into `.cjhx/tasks/`.
 
 ## Change lifecycle
@@ -85,4 +87,5 @@ Core workflow contracts use `SourceControlAdapter`; product-specific implementat
 - Implement TypeScript interfaces in `src/adapters.ts` for production platforms.
 - Package domain and project Skills with manifests and evaluation cases.
 - Implement a remote sandbox executor behind `SkillRuntime` for untrusted extensions.
+- Replace local `AgentService` process execution with isolated worktrees and a container, gVisor/Kata, or micro-VM runner with egress, credential, CPU, memory, and filesystem policy.
 - Implement `ObservabilityAdapter` later without changing the lifecycle contract.

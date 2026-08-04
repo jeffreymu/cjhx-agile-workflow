@@ -1,4 +1,5 @@
 export * from "./adapters.js";
+export * from "./agents.js";
 export * from "./devops-config.js";
 export * from "./devops.js";
 export * from "./errors.js";

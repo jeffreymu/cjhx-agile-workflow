@@ -58,7 +58,9 @@ The UI supports:
 20. browsing local directory trees and UTF-8 files, searching filenames/content, listing worktrees and refs, and inspecting commits;
 21. creating/removing local worktrees, branches, and tags with explicit human approval;
 22. importing configured GitLab/GitHub repositories as virtual Workspaces without cloning them;
-23. browsing remote directory trees, files, refs, commits, issue, PR/MR, and comments as live Provider projections.
+23. browsing remote directory trees, files, refs, commits, issue, PR/MR, and comments as live Provider projections;
+24. configuring multiple Claude Code, Codex, Qoder, or custom non-interactive Agent CLI profiles, testing their executables with approval, and choosing a default Agent;
+25. launching approved task development in the task's local Workspace and inspecting task-scoped Agent Run status and output from the Agent page, task detail, or Workspace Sessions.
 
 ## Security boundary
 
@@ -70,6 +72,9 @@ The built-in UI is a local SDK/MVP control surface, not an internet-facing enter
 - Request bodies are limited to 1 MB.
 - Local file browsing is confined to the canonical Git root, rejects symlinks that escape it, excludes `.git`, dependencies/build output from search, limits previews to 1 MB, and never exposes the active `.cjhx` state directory or Adapter credentials.
 - Worktree and Git-ref mutations require explicit human approval; commands use `execFile` argument arrays rather than a shell.
+- Agent executable tests and task development runs require explicit human approval. Agent commands use argument arrays with `shell: false`, run only from a task-associated local Workspace root, inherit only baseline process variables plus explicitly configured keys, have 1–120 minute timeouts, and cap stdout/stderr at 1 MB each.
+- The unauthenticated snapshot exposes only Agent profile/run metadata. Full commands, arguments, stdout, and stderr require the ephemeral UI session token. Agent config and run files use mode `0600`.
+- A local Agent CLI shares the operating-system user's privileges and is not a sandbox. The prompt forbids push, publish, deploy, and destructive Git operations, but local enforcement cannot guarantee compliance. Enterprise use must execute Agents in isolated worktrees plus containers, gVisor/Kata, or micro-VMs with egress and credential policy.
 - The unified board does not copy remote work items. GitHub/GitLab issue and PR/MR cards are live, read-only Adapter projections; CJHX/Jira task cards keep their existing authority and approval rules.
 - Virtual Workspace data is read live through the saved Provider Adapter. It is not persisted as a second issue, PR, comment, or repository truth.
 - The UI cannot skip lifecycle evidence gates.

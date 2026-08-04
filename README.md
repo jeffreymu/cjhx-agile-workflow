@@ -25,6 +25,7 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - 统一任务看板：以同一七状态模型聚合 CJHX 本地草稿、Jira 任务投影以及 GitHub/GitLab issue 和 PR/MR；支持全局或 Workspace 范围、来源、类型、变更、Owner、风险和状态筛选；
 - DevOps 控制面：展示流水线和运行状态、制品版本、服务状态，并通过显式审批触发 CI/CD 或启停服务；
 - 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider；
+- 开发智能体配置：在 UI 中配置 Claude Code、Codex、Qoder（兼容 qorder 称呼）或自定义非交互式 CLI，多配置共存并选择默认 Agent；经人工批准后可从任务详情启动本地 Workspace 开发，并记录任务级 Agent Run；
 - Workspace Hub：以 Workspace 为范围提供 Overview、Kanban、Sessions、Team 和 Codebase 视图；Kanban 与全局任务看板复用同一投影和交互；支持导入/移除本地 Git 仓库，搜索文件，管理经审批的 worktree 与 Git refs，浏览并检查提交；
 - 虚拟 Workspace：无需克隆即可导入已配置的 GitLab/GitHub 仓库，实时浏览目录、文件、refs、提交、issue、PR/MR 和评论。
 
@@ -90,10 +91,12 @@ npm run ui
 ├── runs/               # Skill 和 Workflow 执行记录
 ├── tasks/              # 未发布任务草稿和 Jira 任务状态投影
 ├── workspaces/         # 本地仓库引用和虚拟仓库元数据；不复制远端事实
+├── agents/             # Agent CLI 配置；文件权限为 0600
+├── agent-runs/         # 任务级 Agent 运行与输出；文件权限为 0600
 └── integrations/       # 本地 Adapter 配置；凭据文件权限为 0600
 ```
 
-业务事实仍保存在其权威平台中；`.cjhx` 不复制 Jira、Confluence、DevOps 或代码托管平台的完整业务数据。虚拟 Workspace 每次通过对应 Adapter 实时读取远端投影。
+业务事实仍保存在其权威平台中；`.cjhx` 不复制 Jira、Confluence、DevOps 或代码托管平台的完整业务数据。Agent 配置与运行记录是 CJHX 本地控制面事实，但本地 CLI Agent 与 UI 进程共享操作系统用户权限，不构成安全沙箱；企业生产使用必须迁移到隔离 Worktree、容器或微虚机执行器。虚拟 Workspace 每次通过对应 Adapter 实时读取远端投影。
 
 ## 生命周期门禁示例
 

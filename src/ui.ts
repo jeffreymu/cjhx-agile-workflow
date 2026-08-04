@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pipelineKinds, serviceActions, type PipelineKind, type ServiceAction } from "./devops.js";
+import { agentKinds, type AgentKind, type PromptTransport } from "./agents.js";
 import { CJHXError, ValidationError } from "./errors.js";
 import { CJHXFramework } from "./framework.js";
 import { availableTransitions } from "./lifecycle.js";
@@ -43,7 +44,9 @@ function send(response: ServerResponse, status: number, value: unknown): void {
 function snapshot(app: CJHXFramework): JsonObject {
   const changes = app.workspace.listChanges().map((change) => ({ ...change, nextTransitions: availableTransitions(change) }));
   const skills = app.registry.list().map((locked) => ({ ...locked, manifest: app.registry.resolve(locked.id).manifest }));
-  return { workspace: app.workspace.root, workspaces: app.workspaceHub.list(), changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira"), jiraConfig: app.jiraIntegration.summary(), devopsConfigured: app.devops.configured(), devopsConfig: app.devopsIntegration.summary(), sourceControl: app.sourceControlIntegration.summary(), gitLabConfig: app.gitLabIntegration.summary(), gitHubConfig: app.gitHubIntegration.summary() } } as unknown as JsonObject;
+  const agents = app.agents.summary(); const agentSummary = { configured: agents.configured, ...(agents.defaultAgentId ? { defaultAgentId: agents.defaultAgentId } : {}), profiles: agents.profiles.map(({ id, name, kind, version, testedAt, default: isDefault }) => ({ id, name, kind, ...(version ? { version } : {}), testedAt, default: isDefault })) };
+  const agentRuns = app.agents.listRuns().map(({ id, taskId, changeId, workspaceId, agentId, agentName, status, startedAt, completedAt, exitCode }) => ({ id, taskId, changeId, workspaceId, agentId, agentName, status, startedAt, ...(completedAt ? { completedAt } : {}), ...(exitCode !== undefined ? { exitCode } : {}) }));
+  return { workspace: app.workspace.root, workspaces: app.workspaceHub.list(), changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), agentRuns, agents: agentSummary, lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira"), jiraConfig: app.jiraIntegration.summary(), devopsConfigured: app.devops.configured(), devopsConfig: app.devopsIntegration.summary(), sourceControl: app.sourceControlIntegration.summary(), gitLabConfig: app.gitLabIntegration.summary(), gitHubConfig: app.gitHubIntegration.summary() } } as unknown as JsonObject;
 }
 
 function openBrowser(url: string): void {
@@ -70,6 +73,10 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "GET" && path === "/api/snapshot") { send(response, 200, snapshot(app)); return; }
       if (method === "GET" && path === "/api/devops/overview") { send(response, 200, await app.devops.overview(optionalText(url.searchParams.get("changeId")))); return; }
       if (method === "GET" && path === "/api/board") { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, await app.workspaceHub.board(optionalText(url.searchParams.get("workspaceId")))); return; }
+      if (method === "GET" && path === "/api/agents") { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, app.agents.summary()); return; }
+      if (method === "GET" && path === "/api/agent-runs") { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, app.agents.listRuns(optionalText(url.searchParams.get("taskId")))); return; }
+      const agentRunReadMatch = path.match(/^\/api\/agent-runs\/([^/]+)$/);
+      if (method === "GET" && agentRunReadMatch?.[1]) { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, app.agents.getRun(decode(agentRunReadMatch[1]))); return; }
       let workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)\/(overview|kanban|sessions|team|tree|file|search|refs|commits|worktrees|issues|change-requests)$/);
       if (method === "GET" && workspaceMatch && request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; }
       if (method === "GET" && workspaceMatch?.[1] && workspaceMatch[2]) { const id = decode(workspaceMatch[1]); const action = workspaceMatch[2]; const ref = optionalText(url.searchParams.get("ref")); const itemPath = url.searchParams.get("path") ?? ""; const result = action === "overview" ? await app.workspaceHub.overview(id) : action === "kanban" ? await app.workspaceHub.kanban(id) : action === "sessions" ? app.workspaceHub.sessions(id) : action === "team" ? await app.workspaceHub.team(id) : action === "tree" ? await app.workspaceHub.tree(id, itemPath, ref) : action === "file" ? await app.workspaceHub.file(id, text(itemPath, "path"), ref) : action === "search" ? app.workspaceHub.search(id, text(url.searchParams.get("q"), "q")) : action === "refs" ? await app.workspaceHub.refs(id) : action === "commits" ? await app.workspaceHub.commits(id, ref) : action === "worktrees" ? app.workspaceHub.worktrees(id) : action === "issues" ? await app.workspaceHub.issues(id) : await app.workspaceHub.changeRequests(id); send(response, 200, result); return; }
@@ -86,6 +93,15 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method !== "GET" && request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; }
 
       const input = method === "GET" ? {} : await body(request);
+      const agentInput = () => { const kind = text(input.kind, "kind"); if (!agentKinds.includes(kind as AgentKind)) throw new ValidationError("invalid agent kind"); const promptTransport = text(input.promptTransport, "promptTransport"); if (promptTransport !== "argument" && promptTransport !== "stdin") throw new ValidationError("invalid prompt transport"); return { id: text(input.id, "id"), name: text(input.name, "name"), kind: kind as AgentKind, command: text(input.command, "command"), arguments: stringArray(input.arguments), versionArguments: stringArray(input.versionArguments), promptTransport: promptTransport as PromptTransport, timeoutMinutes: Number(input.timeoutMinutes), environmentKeys: stringArray(input.environmentKeys) }; };
+      if (method === "POST" && path === "/api/agents/test") { send(response, 200, { version: await app.agents.test(agentInput(), { approved: input.approved === true }) }); return; }
+      let agentMatch = path.match(/^\/api\/agents\/([^/]+)$/);
+      if (method === "PUT" && agentMatch?.[1]) { const profile = agentInput(); if (profile.id !== decode(agentMatch[1])) throw new ValidationError("agent id does not match URL"); send(response, 200, await app.agents.save(profile, { approved: input.approved === true })); return; }
+      if (method === "DELETE" && agentMatch?.[1]) { send(response, 200, app.agents.remove(decode(agentMatch[1]))); return; }
+      agentMatch = path.match(/^\/api\/agents\/([^/]+)\/activate$/);
+      if (method === "POST" && agentMatch?.[1]) { send(response, 200, app.agents.activate(decode(agentMatch[1]))); return; }
+      const agentRunMatch = path.match(/^\/api\/tasks\/([^/]+)\/agent-runs$/);
+      if (method === "POST" && agentRunMatch?.[1]) { send(response, 202, app.startAgentForTask(decode(agentRunMatch[1]), { ...(optionalText(input.agentId) ? { agentId: optionalText(input.agentId) } : {}), ...(optionalText(input.instructions) ? { instructions: optionalText(input.instructions) } : {}), approved: input.approved === true })); return; }
       if (method === "POST" && path === "/api/workspaces") { const kind = text(input.kind, "kind"); if (kind === "local") send(response, 201, app.workspaceHub.addLocal({ path: text(input.path, "path"), ...(optionalText(input.name) ? { name: optionalText(input.name) } : {}) })); else if (kind === "virtual") { const provider = text(input.provider, "provider"); if (provider !== "gitlab" && provider !== "github") throw new ValidationError("provider must be gitlab or github"); send(response, 201, await app.workspaceHub.addVirtual({ provider, repositoryId: text(input.repositoryId, "repositoryId"), ...(optionalText(input.name) ? { name: optionalText(input.name) } : {}), ...(optionalText(input.defaultRef) ? { defaultRef: optionalText(input.defaultRef) } : {}) })); } else throw new ValidationError("kind must be local or virtual"); return; }
       workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)$/);
       if (method === "DELETE" && workspaceMatch?.[1]) { app.workspaceHub.remove(decode(workspaceMatch[1])); send(response, 200, { removed: true }); return; }
