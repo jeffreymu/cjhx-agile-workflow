@@ -1,0 +1,14 @@
+{
+  "id": "api-test.execute",
+  "version": "1.0.0",
+  "name": "自动化 API 测试执行",
+  "description": "通过 DevOps Adapter 请求 API 测试验证，返回平台执行引用",
+  "owner": "cjhx-quality-team",
+  "source": "internal",
+  "riskLevel": "S3",
+  "entrypoint": {"type": "builtin", "target": "api_test_execute"},
+  "permissions": ["devops.validation.trigger"],
+  "tags": ["api", "test", "devops"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": true
+}

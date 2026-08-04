@@ -1,0 +1,14 @@
+{
+  "id": "review.code.basic",
+  "version": "1.0.0",
+  "name": "基础代码评审",
+  "description": "演示结构化代码评审发现协议，不替代生产级语义评审",
+  "owner": "cjhx-quality-team",
+  "source": "internal",
+  "riskLevel": "S1",
+  "entrypoint": {"type": "builtin", "target": "code_review"},
+  "permissions": [],
+  "tags": ["code", "review", "quality"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": false
+}

@@ -1,0 +1,14 @@
+{
+  "id": "requirement.decompose",
+  "version": "1.0.0",
+  "name": "需求拆解",
+  "description": "将已澄清需求拆成可跟踪和验收的任务",
+  "owner": "cjhx-platform-team",
+  "source": "internal",
+  "riskLevel": "S1",
+  "entrypoint": {"type": "builtin", "target": "requirement_decompose"},
+  "permissions": [],
+  "tags": ["requirement", "planning"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": false
+}

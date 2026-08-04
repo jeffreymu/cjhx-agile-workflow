@@ -1,0 +1,14 @@
+{
+  "id": "sync.jira-requirement-to-confluence",
+  "version": "1.0.0",
+  "name": "Jira 需求同步到 Confluence 草稿",
+  "description": "根据 Jira 工作项创建 Confluence 需求草稿，不发布页面或修改流程状态",
+  "owner": "cjhx-platform-team",
+  "source": "internal",
+  "riskLevel": "S2",
+  "entrypoint": {"type": "builtin", "target": "jira_confluence_sync"},
+  "permissions": ["confluence.page.create-draft"],
+  "tags": ["jira", "confluence", "sync"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": true
+}

@@ -1,0 +1,17 @@
+{
+  "workspace": ".cjhx",
+  "policy": {
+    "maxAutomaticRisk": "S3",
+    "allowedExternalSources": ["internal", "approved-external"],
+    "requireApprovalForWrite": true,
+    "allowProcessSkills": false,
+    "processTimeoutSeconds": 120
+  },
+  "integrations": {
+    "jira": {"enabled": false, "baseUrl": "${JIRA_BASE_URL}", "tokenEnv": "JIRA_TOKEN"},
+    "confluence": {"enabled": false, "baseUrl": "${CONFLUENCE_BASE_URL}", "tokenEnv": "CONFLUENCE_TOKEN"},
+    "sourceControl": {"enabled": false, "provider": "configure-adapter"},
+    "devops": {"enabled": false, "baseUrl": "${DEVOPS_BASE_URL}", "tokenEnv": "DEVOPS_TOKEN"},
+    "observability": {"enabled": false, "provider": "manual"}
+  }
+}

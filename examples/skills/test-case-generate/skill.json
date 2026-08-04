@@ -1,0 +1,14 @@
+{
+  "id": "test.case.generate",
+  "version": "1.0.0",
+  "name": "测试用例生成",
+  "description": "从功能与验收标准生成基础、边界和失败用例",
+  "owner": "cjhx-quality-team",
+  "source": "internal",
+  "riskLevel": "S1",
+  "entrypoint": {"type": "builtin", "target": "test_case_generate"},
+  "permissions": [],
+  "tags": ["test", "quality"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": false
+}

@@ -1,0 +1,14 @@
+{
+  "id": "api-test.generate",
+  "version": "1.0.0",
+  "name": "外部 API 测试生成示例",
+  "description": "演示经过批准的外部进程 Skill 如何通过标准输入输出协议接入",
+  "owner": "approved-extension-vendor",
+  "source": "approved-external",
+  "riskLevel": "S1",
+  "entrypoint": {"type": "process", "target": "main.py"},
+  "permissions": [],
+  "tags": ["api", "test", "external"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": false
+}
