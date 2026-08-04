@@ -5,7 +5,7 @@ export const writePermissions = new Set([
   "jira.issue.create", "jira.issue.update", "jira.issue.transition",
   "confluence.page.create-draft", "confluence.page.update-draft",
   "scm.branch.create", "scm.change-request.create", "scm.commit-status.publish",
-  "devops.validation.trigger", "devops.artifact.build", "devops.artifact.deploy",
+  "devops.validation.trigger", "devops.artifact.build", "devops.artifact.deploy", "devops.pipeline.trigger", "devops.service.control",
 ]);
 
 export interface PolicyOptions {

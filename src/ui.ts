@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { pipelineKinds, serviceActions, type PipelineKind, type ServiceAction } from "./devops.js";
 import { CJHXError, ValidationError } from "./errors.js";
 import { CJHXFramework } from "./framework.js";
 import { availableTransitions } from "./lifecycle.js";
@@ -42,7 +43,7 @@ function send(response: ServerResponse, status: number, value: unknown): void {
 function snapshot(app: CJHXFramework): JsonObject {
   const changes = app.workspace.listChanges().map((change) => ({ ...change, nextTransitions: availableTransitions(change) }));
   const skills = app.registry.list().map((locked) => ({ ...locked, manifest: app.registry.resolve(locked.id).manifest }));
-  return { workspace: app.workspace.root, changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira") } } as unknown as JsonObject;
+  return { workspace: app.workspace.root, changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira"), devopsConfigured: app.devops.configured() } } as unknown as JsonObject;
 }
 
 function openBrowser(url: string): void {
@@ -67,6 +68,7 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       }
       if (method === "GET" && path in assetTypes) { const content = readFileSync(resolve(assets, path.slice(1))); response.writeHead(200, { "content-type": assetTypes[path], "content-length": content.length, "cache-control": "no-cache", "x-content-type-options": "nosniff" }); response.end(content); return; }
       if (method === "GET" && path === "/api/snapshot") { send(response, 200, snapshot(app)); return; }
+      if (method === "GET" && path === "/api/devops/overview") { send(response, 200, await app.devops.overview(optionalText(url.searchParams.get("changeId")))); return; }
       if (method !== "GET" && request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; }
 
       const input = method === "GET" ? {} : await body(request);
@@ -78,6 +80,14 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "POST" && match?.[1]) { const evidence = app.addEvidence(decode(match[1]), { kind: text(input.kind, "kind"), source: text(input.source, "source"), status: text(input.status, "status"), subjectRef: text(input.subjectRef, "subjectRef"), ...(optionalText(input.uri) ? { uri: optionalText(input.uri) } : {}) }); send(response, 201, evidence); return; }
       match = path.match(/^\/api\/changes\/([^/]+)\/transitions$/);
       if (method === "POST" && match?.[1]) { const target = text(input.target, "target"); if (!lifecycleStates.includes(target as LifecycleState)) throw new ValidationError(`invalid lifecycle state: ${target}`); const change = app.transitionChange(decode(match[1]), target as LifecycleState, { actor: text(input.actor, "actor"), reason: text(input.reason, "reason") }); send(response, 200, change); return; }
+      if (method === "POST" && path === "/api/devops/pipelines/trigger") {
+        const kind = text(input.kind, "kind"); if (!pipelineKinds.includes(kind as PipelineKind)) throw new ValidationError(`invalid pipeline kind: ${kind}`);
+        send(response, 202, await app.devops.triggerPipeline({ pipelineId: text(input.pipelineId, "pipelineId"), kind: kind as PipelineKind, ...(optionalText(input.changeId) ? { changeId: optionalText(input.changeId) } : {}), ...(optionalText(input.ref) ? { ref: optionalText(input.ref) } : {}), ...(optionalText(input.environment) ? { environment: optionalText(input.environment) } : {}), actor: text(input.actor, "actor"), reason: text(input.reason, "reason"), approved: input.approved === true })); return;
+      }
+      if (method === "POST" && path === "/api/devops/services/control") {
+        const action = text(input.action, "action"); if (!serviceActions.includes(action as ServiceAction)) throw new ValidationError(`invalid service action: ${action}`);
+        send(response, 202, await app.devops.controlService({ serviceId: text(input.serviceId, "serviceId"), action: action as ServiceAction, ...(optionalText(input.environment) ? { environment: optionalText(input.environment) } : {}), actor: text(input.actor, "actor"), reason: text(input.reason, "reason"), approved: input.approved === true })); return;
+      }
       if (method === "POST" && path === "/api/tasks") {
         const priority = optionalText(input.priority) ?? "P2"; const riskLevel = optionalText(input.riskLevel) ?? "L1"; const status = optionalText(input.status) ?? "todo";
         if (!taskPriorities.includes(priority as TaskPriority)) throw new ValidationError(`invalid task priority: ${priority}`); if (!riskLevels.includes(riskLevel as RiskLevel)) throw new ValidationError(`invalid task risk: ${riskLevel}`); if (!taskStatuses.includes(status as TaskStatus)) throw new ValidationError(`invalid task status: ${status}`);

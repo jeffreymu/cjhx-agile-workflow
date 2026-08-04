@@ -35,6 +35,8 @@ The framework never gives platform credentials to a Skill. A Skill emits request
 
 The Web UI is an experience adapter over the same `CJHXFramework` facade and `.cjhx` workspace. It does not maintain a parallel lifecycle or evidence store. Its local HTTP server is loopback-only and requires an ephemeral per-process token for mutations.
 
+DevOps pipeline, run, artifact, and service data is read as a live projection through `DevOpsService` and is not copied into `.cjhx`. Pipeline and service commands pass through the framework and `ToolBroker`; all such writes require explicit human approval, actor, and reason before the Adapter is invoked.
+
 Requirement decomposition output may be promoted into local task drafts under `.cjhx/tasks/`. Drafts have a CJHX-owned task state machine. Publishing a draft through `JiraAdapter` transfers task authority to Jira; the board then renders a synchronized projection, and status writes require explicit approval through `ToolBroker`.
 
 ## Change lifecycle

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ToolBroker } from "./adapters.js";
+import { DevOpsService } from "./devops.js";
 import { ValidationError } from "./errors.js";
 import { transition } from "./lifecycle.js";
 import { createChange, type Change, type Evidence, type JsonObject, type LifecycleState, type RiskLevel, utcNow } from "./models.js";
@@ -10,9 +11,9 @@ import { TaskService, type TaskPriority, type TaskStatus } from "./tasks.js";
 import { WorkflowRuntime, type WorkflowDefinition, type WorkflowRun } from "./workflows.js";
 
 export class CJHXFramework {
-  readonly workspace: Workspace; readonly policy: Policy; readonly registry: SkillRegistry; readonly runtime: SkillRuntime; readonly workflows: WorkflowRuntime; readonly tasks: TaskService;
+  readonly workspace: Workspace; readonly policy: Policy; readonly registry: SkillRegistry; readonly runtime: SkillRuntime; readonly workflows: WorkflowRuntime; readonly tasks: TaskService; readonly devops: DevOpsService;
   constructor(workspace = ".cjhx", options: { policy?: Policy; tools?: ToolBroker } = {}) {
-    this.workspace = new Workspace(workspace); this.policy = options.policy ?? new Policy(); this.registry = new SkillRegistry(this.workspace, this.policy); this.runtime = new SkillRuntime(this.workspace, this.registry, this.policy, options.tools); this.workflows = new WorkflowRuntime(this.workspace, this.runtime); this.tasks = new TaskService(this.workspace, this.runtime.tools);
+    this.workspace = new Workspace(workspace); this.policy = options.policy ?? new Policy(); this.registry = new SkillRegistry(this.workspace, this.policy); this.runtime = new SkillRuntime(this.workspace, this.registry, this.policy, options.tools); this.workflows = new WorkflowRuntime(this.workspace, this.runtime); this.tasks = new TaskService(this.workspace, this.runtime.tools); this.devops = new DevOpsService(this.runtime.tools);
   }
   initialize(): void { this.workspace.initialize(); }
   createChange(id: string, title: string, owner: string, options: { description?: string; riskLevel?: RiskLevel } = {}): Change {

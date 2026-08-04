@@ -18,6 +18,17 @@ Implement the product-neutral `SourceControlAdapter`. The core only depends on r
 
 Implement `DevOpsAdapter` against the installed BoCloud product/version. Map validation, test result, immutable artifact, environment, deployment, and rollback capabilities. The exact API and webhook surface must be discovered from the deployed edition.
 
+The local control surface exposes a platform-neutral DevOps projection for:
+
+- pipeline definitions and current health;
+- recent CI/CD runs and status;
+- immutable artifacts and versions;
+- deployed services, environments, versions, and running state.
+
+It can trigger CI/CD pipelines and start, stop, or restart services. Every write requires an explicit approval flag plus actor and reason; `DevOpsService` rejects unapproved writes before invoking `ToolBroker`. When no Adapter is configured, the UI shows the capability as unavailable and never simulates success. Read data is refreshed from BoCloud and is not persisted as a second source of truth.
+
+Production Adapter implementations must map `listPipelines`, `listPipelineRuns`, `listArtifacts`, `listServices`, `triggerPipeline`, and `controlService` to the installed BoCloud edition. Restrict pipeline, environment, and service access by enterprise identity and policy in addition to the local confirmation gate.
+
 ## Observability
 
 `ObservabilityAdapter` is reserved. Until configured, deployment observation is a Jira-owned manual task. Later implementations can provide deployment health and related incidents without changing the lifecycle state machine.
