@@ -6,7 +6,7 @@
   "owner": "approved-extension-vendor",
   "source": "approved-external",
   "riskLevel": "S1",
-  "entrypoint": {"type": "process", "target": "main.py"},
+  "entrypoint": {"type": "process", "target": "main.mjs"},
   "permissions": [],
   "tags": ["api", "test", "external"],
   "timeoutSeconds": 30,

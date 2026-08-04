@@ -4,5 +4,6 @@
 - Jira owns work-item state; Confluence owns long-form requirements/design; DevOps owns verification, artifacts, and deployment.
 - Skills never receive platform credentials. All platform access must pass through `ToolBroker` permissions.
 - Every externally supplied skill is untrusted. Preserve digest locking, timeout, minimal environment, and fail-closed behavior.
-- Add or update `unittest` coverage for behavior changes.
-- Run `PYTHONPATH=src python3 -m unittest discover -s tests -v` before committing.
+- Keep the framework, CLI, built-in Skills, and tests TypeScript-first. Use Python only behind the language-neutral external Skill boundary when a required SDK has no TypeScript implementation.
+- Add or update Node test coverage for behavior changes.
+- Run `npm run check` before committing.

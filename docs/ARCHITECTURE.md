@@ -2,7 +2,7 @@
 
 ## Purpose
 
-CJHX Agile Workflow is a platform-neutral, skill-driven Agentic SDLC control plane. It coordinates authoritative platforms rather than replacing them.
+CJHX Agile Workflow is a TypeScript-first, platform-neutral, skill-driven Agentic SDLC control plane. It coordinates authoritative platforms rather than replacing them.
 
 ## Authoritative systems
 
@@ -68,7 +68,7 @@ Core workflow contracts use `SourceControlAdapter`; product-specific implementat
 
 ## Extension seams
 
-- Implement Protocols in `adapters.py` for production platforms.
+- Implement TypeScript interfaces in `src/adapters.ts` for production platforms.
 - Package domain and project Skills with manifests and evaluation cases.
-- Implement a remote sandbox executor behind `SkillRuntime._invoke` for untrusted extensions.
+- Implement a remote sandbox executor behind `SkillRuntime` for untrusted extensions.
 - Implement `ObservabilityAdapter` later without changing the lifecycle contract.

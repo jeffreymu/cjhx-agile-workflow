@@ -7,7 +7,7 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 → 质量验证 → 交付验收 → 变更质检与部署 → 持续迭代
 ```
 
-当前仓库提供一个可运行的 MVP 控制面和扩展 SDK，不替代现有研发平台。
+当前仓库提供一个可运行的 **TypeScript-first** MVP 控制面和扩展 SDK，不替代现有研发平台。核心框架、CLI、内置 Skills 和测试均使用 TypeScript；只有第三方能力仅提供 Python SDK 时，才通过语言无关的外部进程或服务协议接入。
 
 ## 已实现
 
@@ -37,13 +37,13 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 
 ## 快速开始
 
-要求 Python 3.11+，运行时无第三方依赖。
+要求 Node.js 20+。
 
 ```bash
 cd cjhx-agile-workflow
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -e .
+npm install --include=dev
+npm run build
+npm link
 
 cjhx init
 cjhx change-create PAY-128 "批量取消订单" --owner product-owner
@@ -97,7 +97,7 @@ cjhx change-transition PAY-128 intent_confirmed \
 ```text
 my-skill/
 ├── skill.json
-├── main.py             # 可选外部进程入口
+├── main.mjs            # 可选外部进程入口；也可使用其他语言
 ├── schemas/            # 推荐：输入输出 Schema
 ├── tests/              # 推荐：行为测试
 └── evaluations/        # 推荐：质量、安全和回归评测
@@ -114,9 +114,12 @@ CLI 的 `--input` 接受 JSON 字符串或文件路径。外部可执行 Skill �
 ## 开发与测试
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
-PYTHONPATH=src python3 -m compileall -q src tests
+npm run typecheck       # TypeScript strict mode
+npm test                # 构建并运行 Node 原生测试
+npm run check           # 完整检查
 ```
+
+如果当前 shell 设置了 `NODE_ENV=production`，安装开发工具时需要显式使用 `npm install --include=dev`。
 
 ## 文档
 

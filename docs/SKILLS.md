@@ -13,7 +13,7 @@ Every Skill is a versioned package with `skill.json`:
   "owner": "team-id",
   "source": "internal",
   "riskLevel": "S1",
-  "entrypoint": {"type": "process", "target": "main.py"},
+  "entrypoint": {"type": "process", "target": "main.mjs"},
   "permissions": [],
   "tags": ["requirement"],
   "timeoutSeconds": 30,
@@ -61,11 +61,15 @@ cjhx skill-run requirement.decompose \
   --input '{"requirement":"支持批量取消；记录审计日志"}'
 ```
 
-External process Skills are disabled by default in the Python API. Enable them only with an explicit policy and a hardened execution environment:
+External process Skills are disabled by default in the TypeScript API. Enable them only with an explicit policy and a hardened execution environment:
 
-```python
-CJHXFramework(".cjhx", policy=Policy(allow_process_skills=True))
+```typescript
+new CJHXFramework(".cjhx", {
+  policy: new Policy({ allowProcessSkills: true }),
+});
 ```
+
+The JSON stdin/stdout protocol is language-neutral. Prefer TypeScript/JavaScript for new Skills. If a required SDK only exists in Python, package the Python capability as a sandboxed process or remote service without adding Python to the framework core.
 
 ## Production checklist
 
