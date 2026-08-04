@@ -13,7 +13,7 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 
 - 有证据门禁的研发变更生命周期状态机；
 - 统一 Change、Evidence、Skill、SkillRun 和 WorkflowRun 模型；
-- Skill 本地注册、安装、版本锁定和 SHA-256 防篡改；
+- 扫描本地 `SKILL.md` / `skill.json`，在 UI 中启用或禁用，并对可执行 Skill 版本锁定和 SHA-256 防篡改；
 - 内置 Skill 与受控外部进程 Skill；
 - Skill 风险等级、来源白名单、写操作审批和超时策略；
 - 声明式多 Skill Workflow 和跨步骤 `$ref` 数据传递；
@@ -87,7 +87,8 @@ npm run ui
 .cjhx/
 ├── changes/            # 变更状态与证据索引
 ├── skills/             # 已安装的不可变 Skill 包
-├── skills-lock.json    # 版本与摘要锁定
+├── skills-lock.json    # 可执行 Skill 版本与摘要锁定
+├── local-skills.json   # 已启用 Agent 指引 Skill（0600）
 ├── runs/               # Skill 和 Workflow 执行记录
 ├── tasks/              # 未发布任务草稿和 Jira 任务状态投影
 ├── workspaces/         # 本地仓库引用和虚拟仓库元数据；不复制远端事实
@@ -131,7 +132,7 @@ cjhx skill-list
 cjhx skill-run my.skill --input @payload.json
 ```
 
-CLI 的 `--input` 接受 JSON 字符串或文件路径。外部可执行 Skill 默认禁用；生产使用应在独立沙箱中执行，并经过来源、许可证、依赖、数据外发、权限和质量评测。
+CLI 的 `--input` 接受 JSON 字符串或文件路径。Web 控制台的 Skill Library 还会扫描 Pi、Claude、Codex、Qoder 的用户/项目 Skill 目录；可通过 `CJHX_SKILL_PATHS` 增加企业目录。`SKILL.md` 启用后作为任务 Agent 指引，`skill.json` 启用后进入 CJHX Registry；禁用均不删除原始目录。外部可执行 Skill 默认禁用；生产使用应在独立沙箱中执行，并经过来源、许可证、依赖、数据外发、权限和质量评测。
 
 ## 开发与测试
 

@@ -41,7 +41,7 @@ export class SkillRegistry {
   constructor(readonly workspace: Workspace, readonly policy: Policy) {}
 
   loadManifest(packagePath: string): SkillManifest {
-    try { return parseSkillManifest(JSON.parse(readFileSync(resolve(packagePath, manifestName), "utf8")) as unknown); }
+    try { const path = resolve(packagePath, manifestName); if (lstatSync(path).size > 1_048_576) throw new ValidationError(`${manifestName} exceeds 1 MB`); return parseSkillManifest(JSON.parse(readFileSync(path, "utf8")) as unknown); }
     catch (error) { if (error instanceof ValidationError) throw error; throw new ValidationError(`invalid ${manifestName}: ${error instanceof Error ? error.message : String(error)}`); }
   }
 
@@ -64,6 +64,12 @@ export class SkillRegistry {
   }
 
   list(): ({ id: string } & SkillLockRecord)[] { return Object.entries(this.workspace.getLock().skills).sort(([a], [b]) => a.localeCompare(b)).map(([id, value]) => ({ id, ...value })); }
+
+  disable(skillId: string, expectedDigest?: string): void {
+    const lock = this.workspace.getLock(); const record = lock.skills[skillId]; if (!record) return;
+    if (expectedDigest && record.digest !== expectedDigest) throw new SkillError(`installed Skill does not match the selected local package: ${skillId}`);
+    delete lock.skills[skillId]; this.workspace.saveLock(lock);
+  }
 
   resolve(skillId: string): { manifest: SkillManifest; packagePath: string; digest: string } {
     const record = this.workspace.getLock().skills[skillId]; if (!record) throw new SkillError(`skill is not installed: ${skillId}`);

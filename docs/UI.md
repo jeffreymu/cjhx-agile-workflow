@@ -40,8 +40,8 @@ The UI supports:
 2. viewing all 12 lifecycle stages;
 3. adding typed evidence;
 4. advancing or returning lifecycle state through enforced gates;
-5. installing immutable Skill packages;
-6. running Skills with JSON input and explicit approval;
+5. scanning local pi, Claude, Codex, Qoder, enterprise, and project Skill directories for `SKILL.md` or `skill.json`, then enabling or disabling discovered Skills without deleting their sources;
+6. installing immutable Skill packages manually and running enabled CJHX Skills with JSON input and explicit approval;
 7. running declarative Workflows with `$ref` data flow;
 8. viewing Skill and Workflow execution records and errors;
 9. importing requirement-decomposition output as idempotent local task drafts;
@@ -74,6 +74,7 @@ The built-in UI is a local SDK/MVP control surface, not an internet-facing enter
 - Worktree and Git-ref mutations require explicit human approval; commands use `execFile` argument arrays rather than a shell.
 - Agent executable tests and task development runs require explicit human approval. Agent commands use argument arrays with `shell: false`, run only from a task-associated local Workspace root, inherit only baseline process variables plus explicitly configured keys, have 1–120 minute timeouts, and cap stdout/stderr at 1 MB each.
 - The unauthenticated snapshot exposes only Agent profile/run metadata. Full commands, arguments, stdout, and stderr require the ephemeral UI session token. Agent config and run files use mode `0600`.
+- Local Skill scanning and enable/disable APIs require the UI token because scan results contain absolute local paths. Agent instruction enablement is stored in `.cjhx/local-skills.json` with mode `0600`; scanning does not follow symlink directories or modify discovered files.
 - A local Agent CLI shares the operating-system user's privileges and is not a sandbox. The prompt forbids push, publish, deploy, and destructive Git operations, but local enforcement cannot guarantee compliance. Enterprise use must execute Agents in isolated worktrees plus containers, gVisor/Kata, or micro-VMs with egress and credential policy.
 - The unified board does not copy remote work items. GitHub/GitLab issue and PR/MR cards are live, read-only Adapter projections; CJHX/Jira task cards keep their existing authority and approval rules.
 - Virtual Workspace data is read live through the saved Provider Adapter. It is not persisted as a second issue, PR, comment, or repository truth.

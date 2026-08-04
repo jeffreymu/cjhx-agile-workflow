@@ -53,7 +53,22 @@ Default policy allows automatic execution through S3, but any declared write per
 
 Default approved sources are `internal` and `approved-external`. External packages must complete license, source, dependency, network, data-egress, permission, and evaluation review before using `approved-external`.
 
-## Install and run
+## Local discovery, enablement, and installation
+
+The Skill Library can scan local directories for two extension formats:
+
+- `skill.json`: a CJHX executable Skill package. Enabling installs and digest-locks it in `SkillRegistry`; disabling removes the lock entry but does not delete either the source package or the immutable installed copy.
+- `SKILL.md`: an Agent instruction Skill used by tools such as Claude Code, Codex, Qoder, and pi. Enabling records its SHA-256 digest in `.cjhx/local-skills.json` and adds its name, description, and instruction-file path to task Agent prompts. If the file changes it becomes disabled until the user explicitly enables the new content. The Agent reads the file only when relevant to the task.
+
+Default scan roots include user and project Skill directories for pi, Claude, Codex, and Qoder. Add enterprise or custom roots with the platform path delimiter:
+
+```bash
+export CJHX_SKILL_PATHS="/opt/company/skills:$HOME/company-skills"
+```
+
+Scanning is read-only, does not follow symbolic-link directories, skips `.git`, `.cjhx`, and `node_modules`, limits recursion and entry count, and reports an unavailable or malformed directory as a warning. Local paths are returned only by the token-protected UI API. Enablement never bypasses source, risk, process-execution, permission, or approval policy.
+
+Manual CJHX package installation remains available:
 
 ```bash
 cjhx skill-install examples/skills/requirement-decompose

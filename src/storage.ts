@@ -20,6 +20,7 @@ export class Workspace {
   readonly agents: string;
   readonly agentRuns: string;
   readonly agentConfig: string;
+  readonly localSkillConfig: string;
   readonly lockfile: string;
 
   constructor(root = ".cjhx") {
@@ -33,6 +34,7 @@ export class Workspace {
     this.agents = resolve(this.root, "agents");
     this.agentRuns = resolve(this.root, "agent-runs");
     this.agentConfig = resolve(this.agents, "config.json");
+    this.localSkillConfig = resolve(this.root, "local-skills.json");
     this.lockfile = resolve(this.root, "skills-lock.json");
   }
 
@@ -77,6 +79,9 @@ export class Workspace {
   agentConfigExists(): boolean { return existsSync(this.agentConfig); }
   getAgentConfig(): JsonValue { return this.readJson(this.agentConfig); }
   saveAgentConfig(value: JsonValue): void { this.initialize(); this.writePrivateJson(this.agentConfig, value); }
+  localSkillConfigExists(): boolean { return existsSync(this.localSkillConfig); }
+  getLocalSkillConfig(): JsonValue { return this.readJson(this.localSkillConfig); }
+  saveLocalSkillConfig(value: JsonValue): void { this.initialize(); this.writePrivateJson(this.localSkillConfig, value); }
   saveAgentRun(run: AgentRun): void { this.initialize(); this.writePrivateJson(this.entityPath(this.agentRuns, run.id, "agent run id"), run as unknown as JsonValue); }
   getAgentRun(id: string): AgentRun { return this.readJson(this.entityPath(this.agentRuns, id, "agent run id")) as unknown as AgentRun; }
   listAgentRuns(): AgentRun[] { this.initialize(); return this.jsonFiles(this.agentRuns).map((path) => this.readJson(path) as unknown as AgentRun).sort((a, b) => b.startedAt.localeCompare(a.startedAt)); }

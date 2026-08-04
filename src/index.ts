@@ -9,6 +9,7 @@ export * from "./github-config.js";
 export * from "./gitlab-config.js";
 export * from "./jira-config.js";
 export * from "./lifecycle.js";
+export * from "./local-skills.js";
 export * from "./models.js";
 export * from "./policy.js";
 export * from "./skills.js";

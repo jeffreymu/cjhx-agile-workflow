@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { createServer, request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -67,6 +67,16 @@ test("UI API creates changes and drives evidence-gated transitions", async (t) =
   assert.equal(response.status, 200); assert.equal((await json(response)).state, "intent_confirmed");
   const snapshot = await json(await fetch(`${base}/api/snapshot`)); const changes = snapshot.changes as Array<Record<string, unknown>>;
   assert.equal(changes.length, 1); assert.deepEqual(changes[0]?.nextTransitions, [{ target: "requirement_ready", missingEvidence: ["requirement-spec"] }, { target: "intent_draft", missingEvidence: [] }]);
+});
+
+test("UI API scans and toggles locally installed Skills", async (t) => {
+  const root = mkdtempSync(resolve(tmpdir(), "cjhx-ui-local-skills-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const catalog = resolve(root, "catalog"); const instructions = resolve(catalog, "review-guide"); const { mkdirSync, writeFileSync } = await import("node:fs"); mkdirSync(instructions, { recursive: true }); writeFileSync(resolve(instructions, "SKILL.md"), "---\nname: review-guide\ndescription: Review local changes.\n---\n");
+  const state = resolve(root, ".cjhx"); const app = new CJHXFramework(state, { localSkillRoots: [catalog] }); app.initialize(); const ui = createUiServer(app, { host: "127.0.0.1", port: 0, open: false }); const address = await ui.listen(); t.after(async () => await ui.close()); const base = address.url; const headers = { "content-type": "application/json", "x-cjhx-ui-token": ui.token };
+  let response = await fetch(`${base}/api/local-skills`); assert.equal(response.status, 403); response = await fetch(`${base}/api/local-skills`, { headers }); assert.equal(response.status, 200); let catalogBody = await json(response); const skill = (catalogBody.skills as Array<Record<string, unknown>>)[0]!; assert.equal(skill.name, "review-guide"); assert.equal(skill.enabled, false); assert.equal(skill.path, realpathSync(instructions));
+  response = await fetch(`${base}/api/local-skills/${skill.id as string}/enable`, { method: "POST", headers, body: "{}" }); assert.equal(response.status, 200); assert.equal((await json(response)).enabled, true);
+  response = await fetch(`${base}/api/local-skills/${skill.id as string}/disable`, { method: "POST", headers, body: "{}" }); assert.equal(response.status, 200); assert.equal((await json(response)).enabled, false);
+  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.equal("localSkills" in snapshot, false);
 });
 
 test("UI API installs and runs a Skill against a change", async (t) => {

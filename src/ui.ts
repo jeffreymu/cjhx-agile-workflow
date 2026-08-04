@@ -74,6 +74,7 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "GET" && path === "/api/devops/overview") { send(response, 200, await app.devops.overview(optionalText(url.searchParams.get("changeId")))); return; }
       if (method === "GET" && path === "/api/board") { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, await app.workspaceHub.board(optionalText(url.searchParams.get("workspaceId")))); return; }
       if (method === "GET" && path === "/api/agents") { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, app.agents.summary()); return; }
+      if (method === "GET" && path === "/api/local-skills") { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, app.localSkills.catalog()); return; }
       if (method === "GET" && path === "/api/agent-runs") { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, app.agents.listRuns(optionalText(url.searchParams.get("taskId")))); return; }
       const agentRunReadMatch = path.match(/^\/api\/agent-runs\/([^/]+)$/);
       if (method === "GET" && agentRunReadMatch?.[1]) { if (request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; } send(response, 200, app.agents.getRun(decode(agentRunReadMatch[1]))); return; }
@@ -173,6 +174,8 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       match = path.match(/^\/api\/tasks\/([^/]+)\/jira\/sync$/);
       if (method === "POST" && match?.[1]) { send(response, 200, await app.syncTaskFromJira(decode(match[1]))); return; }
       if (method === "POST" && path === "/api/skills/install") { send(response, 201, app.installSkill(text(input.packagePath, "packagePath"))); return; }
+      match = path.match(/^\/api\/local-skills\/([^/]+)\/(enable|disable)$/);
+      if (method === "POST" && match?.[1] && match[2]) { send(response, 200, match[2] === "enable" ? app.localSkills.enable(decode(match[1])) : app.localSkills.disable(decode(match[1]))); return; }
       match = path.match(/^\/api\/skills\/([^/]+)\/runs$/);
       if (method === "POST" && match?.[1]) { const run = await app.runSkill(decode(match[1]), object(input.input, "input"), { ...(optionalText(input.changeId) ? { changeId: optionalText(input.changeId) } : {}), ...(optionalText(input.workspaceId) ? { workspaceId: optionalText(input.workspaceId) } : {}), approved: input.approved === true }); send(response, 201, run); return; }
       if (method === "POST" && path === "/api/workflows/runs") {
