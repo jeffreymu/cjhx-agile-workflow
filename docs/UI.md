@@ -45,7 +45,7 @@ The UI supports:
 7. running declarative Workflows with `$ref` data flow;
 8. viewing Skill and Workflow execution records and errors;
 9. importing requirement-decomposition output as idempotent local task drafts;
-10. viewing tasks on a seven-column board with Change, Owner, risk, and status filters;
+10. viewing CJHX drafts, Jira projections, GitHub/GitLab issues, and PR/MR on one seven-column board with Workspace, source, kind, Change, Owner, risk, and status filters;
 11. inspecting acceptance criteria, dependencies, evidence references, source runs, and history;
 12. transitioning local tasks through a guarded task state machine;
 13. publishing approved drafts to Jira and synchronizing Jira-owned task projections when a Jira Adapter is configured;
@@ -54,7 +54,7 @@ The UI supports:
 16. testing, saving, updating, and removing standard HTTP Jira and DevOps Gateway configurations without exposing stored credentials;
 17. reviewing configured integrations and their redacted connection summaries from a dedicated Integration Settings page;
 18. configuring GitLab and GitHub independently, and selecting which saved provider currently supplies the platform-neutral `SourceControlAdapter`;
-19. importing local Git repositories as managed Workspaces and switching among Workspace-scoped Overview, Kanban, Sessions, Team, and Codebase views;
+19. importing local Git repositories as managed Workspaces and switching among Workspace-scoped Overview, Kanban, Sessions, Team, and Codebase views; Workspace Kanban reuses the global board component with the current Workspace scope locked;
 20. browsing local directory trees and UTF-8 files, searching filenames/content, listing worktrees and refs, and inspecting commits;
 21. creating/removing local worktrees, branches, and tags with explicit human approval;
 22. importing configured GitLab/GitHub repositories as virtual Workspaces without cloning them;
@@ -70,6 +70,7 @@ The built-in UI is a local SDK/MVP control surface, not an internet-facing enter
 - Request bodies are limited to 1 MB.
 - Local file browsing is confined to the canonical Git root, rejects symlinks that escape it, excludes `.git`, dependencies/build output from search, limits previews to 1 MB, and never exposes the active `.cjhx` state directory or Adapter credentials.
 - Worktree and Git-ref mutations require explicit human approval; commands use `execFile` argument arrays rather than a shell.
+- The unified board does not copy remote work items. GitHub/GitLab issue and PR/MR cards are live, read-only Adapter projections; CJHX/Jira task cards keep their existing authority and approval rules.
 - Virtual Workspace data is read live through the saved Provider Adapter. It is not persisted as a second issue, PR, comment, or repository truth.
 - The UI cannot skip lifecycle evidence gates.
 - Local task drafts use a controlled transition graph. Once published, Jira is authoritative and Jira transitions require explicit approval.

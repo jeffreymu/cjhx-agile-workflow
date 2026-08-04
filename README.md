@@ -22,10 +22,10 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - 需求拆解、测试用例生成、代码评审、API 测试执行、Jira→Confluence 同步示例；
 - CLI、JSON 文件状态存储和执行审计记录；
 - 可视化 Web 控制台：变更导航、12 阶段时间线、证据门禁、Skills、Workflows 和运行记录；
-- 需求拆解任务看板：本地草稿、七阶段状态、验收/依赖/证据详情、筛选，以及受审批约束的 Jira 发布与同步投影；
+- 统一任务看板：以同一七状态模型聚合 CJHX 本地草稿、Jira 任务投影以及 GitHub/GitLab issue 和 PR/MR；支持全局或 Workspace 范围、来源、类型、变更、Owner、风险和状态筛选；
 - DevOps 控制面：展示流水线和运行状态、制品版本、服务状态，并通过显式审批触发 CI/CD 或启停服务；
 - 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider；
-- Workspace Hub：以 Workspace 为范围提供 Overview、Kanban、Sessions、Team 和 Codebase 视图；支持导入/移除本地 Git 仓库，搜索文件，管理经审批的 worktree 与 Git refs，浏览并检查提交；
+- Workspace Hub：以 Workspace 为范围提供 Overview、Kanban、Sessions、Team 和 Codebase 视图；Kanban 与全局任务看板复用同一投影和交互；支持导入/移除本地 Git 仓库，搜索文件，管理经审批的 worktree 与 Git refs，浏览并检查提交；
 - 虚拟 Workspace：无需克隆即可导入已配置的 GitLab/GitHub 仓库，实时浏览目录、文件、refs、提交、issue、PR/MR 和评论。
 
 ## 工具职责
