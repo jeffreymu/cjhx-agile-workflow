@@ -23,7 +23,7 @@ async function json(response: Response): Promise<Record<string, unknown>> {
 
 test("UI serves the control surface and workspace snapshot", async (t) => {
   const { base } = await fixture(t);
-  const page = await fetch(base); assert.equal(page.status, 200); assert.match(await page.text(), /CJHX Agile Workflow/);
+  const page = await fetch(base); assert.equal(page.status, 200); const html = await page.text(); assert.match(html, /CJHX Agile Workflow/); assert.match(html, />工作空间</); assert.doesNotMatch(html, /data-view="board"/);
   const response = await fetch(`${base}/api/snapshot`); assert.equal(response.status, 200);
   const body = await json(response); assert.deepEqual(body.changes, []); assert.deepEqual(body.skills, []); assert.deepEqual(body.runs, []);
 });
