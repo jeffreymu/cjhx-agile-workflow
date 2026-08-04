@@ -43,7 +43,12 @@ The UI supports:
 5. installing immutable Skill packages;
 6. running Skills with JSON input and explicit approval;
 7. running declarative Workflows with `$ref` data flow;
-8. viewing Skill and Workflow execution records and errors.
+8. viewing Skill and Workflow execution records and errors;
+9. importing requirement-decomposition output as idempotent local task drafts;
+10. viewing tasks on a seven-column board with Change, Owner, risk, and status filters;
+11. inspecting acceptance criteria, dependencies, evidence references, source runs, and history;
+12. transitioning local tasks through a guarded task state machine;
+13. publishing approved drafts to Jira and synchronizing Jira-owned task projections when a Jira Adapter is configured.
 
 ## Security boundary
 
@@ -54,6 +59,7 @@ The built-in UI is a local SDK/MVP control surface, not an internet-facing enter
 - Responses use a restrictive Content Security Policy, deny framing, disable caching for state, and set `X-Content-Type-Options: nosniff`.
 - Request bodies are limited to 1 MB.
 - The UI cannot skip lifecycle evidence gates.
+- Local task drafts use a controlled transition graph. Once published, Jira is authoritative and Jira transitions require explicit approval.
 - Skill policy, approval requirements, digest checks, ToolBroker permissions, and audit redaction remain enforced by the framework.
 - Process Skills remain disabled unless the server is started with the CLI's global `--allow-process-skills` option.
 

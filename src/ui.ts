@@ -8,6 +8,7 @@ import { CJHXError, ValidationError } from "./errors.js";
 import { CJHXFramework } from "./framework.js";
 import { availableTransitions } from "./lifecycle.js";
 import { isRecord, lifecycleStates, riskLevels, type JsonObject, type JsonValue, type LifecycleState, type RiskLevel } from "./models.js";
+import { taskPriorities, taskStatuses, type TaskPriority, type TaskStatus } from "./tasks.js";
 import { parseWorkflowDefinition } from "./workflows.js";
 
 export interface UiOptions { host?: string; port?: number; open?: boolean }
@@ -21,6 +22,7 @@ const assetTypes: Record<string, string> = { "/app.js": "text/javascript; charse
 function text(value: unknown, key: string): string { if (typeof value !== "string" || !value.trim()) throw new ValidationError(`${key} is required`); return value.trim(); }
 function optionalText(value: unknown): string | undefined { return typeof value === "string" && value.trim() ? value.trim() : undefined; }
 function object(value: unknown, key: string): JsonObject { if (!isRecord(value)) throw new ValidationError(`${key} must be a JSON object`); return value as JsonObject; }
+function stringArray(value: unknown): string[] { if (value === undefined) return []; if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw new ValidationError("expected an array of strings"); return value; }
 function decode(value: string): string { try { return decodeURIComponent(value); } catch { throw new ValidationError("invalid URL encoding"); } }
 function isLoopbackRequestHost(value: string | undefined): boolean { if (!value) return false; try { return loopbackHosts.has(new URL(`http://${value}`).hostname.replace(/^\[|\]$/g, "")); } catch { return false; } }
 
@@ -40,7 +42,7 @@ function send(response: ServerResponse, status: number, value: unknown): void {
 function snapshot(app: CJHXFramework): JsonObject {
   const changes = app.workspace.listChanges().map((change) => ({ ...change, nextTransitions: availableTransitions(change) }));
   const skills = app.registry.list().map((locked) => ({ ...locked, manifest: app.registry.resolve(locked.id).manifest }));
-  return { workspace: app.workspace.root, changes, skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates] } as unknown as JsonObject;
+  return { workspace: app.workspace.root, changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira") } } as unknown as JsonObject;
 }
 
 function openBrowser(url: string): void {
@@ -76,6 +78,19 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "POST" && match?.[1]) { const evidence = app.addEvidence(decode(match[1]), { kind: text(input.kind, "kind"), source: text(input.source, "source"), status: text(input.status, "status"), subjectRef: text(input.subjectRef, "subjectRef"), ...(optionalText(input.uri) ? { uri: optionalText(input.uri) } : {}) }); send(response, 201, evidence); return; }
       match = path.match(/^\/api\/changes\/([^/]+)\/transitions$/);
       if (method === "POST" && match?.[1]) { const target = text(input.target, "target"); if (!lifecycleStates.includes(target as LifecycleState)) throw new ValidationError(`invalid lifecycle state: ${target}`); const change = app.transitionChange(decode(match[1]), target as LifecycleState, { actor: text(input.actor, "actor"), reason: text(input.reason, "reason") }); send(response, 200, change); return; }
+      if (method === "POST" && path === "/api/tasks") {
+        const priority = optionalText(input.priority) ?? "P2"; const riskLevel = optionalText(input.riskLevel) ?? "L1"; const status = optionalText(input.status) ?? "todo";
+        if (!taskPriorities.includes(priority as TaskPriority)) throw new ValidationError(`invalid task priority: ${priority}`); if (!riskLevels.includes(riskLevel as RiskLevel)) throw new ValidationError(`invalid task risk: ${riskLevel}`); if (!taskStatuses.includes(status as TaskStatus)) throw new ValidationError(`invalid task status: ${status}`);
+        const task = app.createTask({ changeId: text(input.changeId, "changeId"), title: text(input.title, "title"), ...(optionalText(input.description) ? { description: optionalText(input.description) } : {}), ...(optionalText(input.owner) ? { owner: optionalText(input.owner) } : {}), priority: priority as TaskPriority, riskLevel: riskLevel as RiskLevel, status: status as TaskStatus, acceptanceCriteria: stringArray(input.acceptanceCriteria), dependencies: stringArray(input.dependencies), evidenceRefs: stringArray(input.evidenceRefs) }); send(response, 201, task); return;
+      }
+      match = path.match(/^\/api\/runs\/([^/]+)\/tasks\/import$/);
+      if (method === "POST" && match?.[1]) { send(response, 201, app.importTasksFromRun(decode(match[1]), text(input.changeId, "changeId"))); return; }
+      match = path.match(/^\/api\/tasks\/([^/]+)\/transitions$/);
+      if (method === "POST" && match?.[1]) { const target = text(input.target, "target"); if (!taskStatuses.includes(target as TaskStatus)) throw new ValidationError(`invalid task status: ${target}`); const task = await app.transitionTaskInAuthority(decode(match[1]), target as TaskStatus, { actor: text(input.actor, "actor"), reason: text(input.reason, "reason"), approved: input.approved === true }); send(response, 200, task); return; }
+      match = path.match(/^\/api\/tasks\/([^/]+)\/jira\/publish$/);
+      if (method === "POST" && match?.[1]) { send(response, 200, await app.publishTaskToJira(decode(match[1]), { approved: input.approved === true })); return; }
+      match = path.match(/^\/api\/tasks\/([^/]+)\/jira\/sync$/);
+      if (method === "POST" && match?.[1]) { send(response, 200, await app.syncTaskFromJira(decode(match[1]))); return; }
       if (method === "POST" && path === "/api/skills/install") { send(response, 201, app.installSkill(text(input.packagePath, "packagePath"))); return; }
       match = path.match(/^\/api\/skills\/([^/]+)\/runs$/);
       if (method === "POST" && match?.[1]) { const run = await app.runSkill(decode(match[1]), object(input.input, "input"), { ...(optionalText(input.changeId) ? { changeId: optionalText(input.changeId) } : {}), approved: input.approved === true }); send(response, 201, run); return; }

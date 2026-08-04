@@ -4,13 +4,14 @@ import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
+import { InMemoryJiraAdapter, ToolBroker } from "../src/adapters.js";
 import { CJHXFramework } from "../src/framework.js";
 import { createUiServer } from "../src/ui.js";
 
-async function fixture(t: test.TestContext) {
+async function fixture(t: test.TestContext, options: { jira?: InMemoryJiraAdapter } = {}) {
   const root = mkdtempSync(resolve(tmpdir(), "cjhx-ui-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const app = new CJHXFramework(resolve(root, ".cjhx")); app.initialize();
+  const app = new CJHXFramework(resolve(root, ".cjhx"), { ...(options.jira ? { tools: new ToolBroker({ jira: options.jira }) } : {}) }); app.initialize();
   const ui = createUiServer(app, { host: "127.0.0.1", port: 0, open: false });
   const address = await ui.listen(); t.after(async () => await ui.close());
   return { app, ui, base: address.url };
@@ -64,6 +65,29 @@ test("UI API installs and runs a Skill against a change", async (t) => {
   response = await fetch(`${base}/api/skills/requirement.decompose/runs`, { method: "POST", headers, body: JSON.stringify({ changeId: "PAY-2", input: { requirement: "支持批量取消；保留审计日志" } }) });
   assert.equal(response.status, 201); assert.equal((await json(response)).status, "succeeded");
   const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.equal((snapshot.runs as unknown[]).length, 1); assert.equal((snapshot.skills as unknown[]).length, 1);
+});
+
+test("UI API creates, imports, and transitions board tasks", async (t) => {
+  const { base, ui } = await fixture(t); const headers = { "content-type": "application/json", "x-cjhx-ui-token": ui.token };
+  await fetch(`${base}/api/changes`, { method: "POST", headers, body: JSON.stringify({ id: "PAY-3", title: "任务看板", owner: "product" }) });
+  let response = await fetch(`${base}/api/tasks`, { method: "POST", headers, body: JSON.stringify({ changeId: "PAY-3", title: "实现接口", owner: "backend", priority: "P1", riskLevel: "L2", acceptanceCriteria: ["返回逐单结果"] }) });
+  assert.equal(response.status, 201); const task = await json(response); assert.equal(task.status, "todo"); assert.equal(task.authority, "local-draft");
+  response = await fetch(`${base}/api/tasks/${task.id as string}/transitions`, { method: "POST", headers, body: JSON.stringify({ target: "in_progress", actor: "backend", reason: "started" }) });
+  assert.equal(response.status, 200); assert.equal((await json(response)).status, "in_progress");
+  await fetch(`${base}/api/skills/install`, { method: "POST", headers, body: JSON.stringify({ packagePath: resolve(process.cwd(), "examples/skills/requirement-decompose") }) });
+  response = await fetch(`${base}/api/skills/requirement.decompose/runs`, { method: "POST", headers, body: JSON.stringify({ changeId: "PAY-3", input: { requirement: "实现审计；补充文档" } }) }); const run = await json(response);
+  response = await fetch(`${base}/api/runs/${run.id as string}/tasks/import`, { method: "POST", headers, body: JSON.stringify({ changeId: "PAY-3" }) }); assert.equal(response.status, 201); assert.equal((await response.json() as unknown[]).length, 2);
+  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.equal((snapshot.tasks as unknown[]).length, 3); assert.deepEqual(snapshot.integrations, { jiraConfigured: false });
+});
+
+test("UI API publishes and synchronizes Jira-owned tasks", async (t) => {
+  const jira = new InMemoryJiraAdapter(); const { base, ui } = await fixture(t, { jira }); const headers = { "content-type": "application/json", "x-cjhx-ui-token": ui.token };
+  await fetch(`${base}/api/changes`, { method: "POST", headers, body: JSON.stringify({ id: "PAY-4", title: "Jira task", owner: "product" }) });
+  let response = await fetch(`${base}/api/tasks`, { method: "POST", headers, body: JSON.stringify({ changeId: "PAY-4", title: "发布任务", owner: "backend" }) }); const draft = await json(response);
+  response = await fetch(`${base}/api/tasks/${draft.id as string}/jira/publish`, { method: "POST", headers, body: JSON.stringify({ approved: false }) }); assert.equal(response.status, 400);
+  response = await fetch(`${base}/api/tasks/${draft.id as string}/jira/publish`, { method: "POST", headers, body: JSON.stringify({ approved: true }) }); assert.equal(response.status, 200); const published = await json(response); assert.equal(published.authority, "jira");
+  jira.setStatus(published.jiraIssueKey as string, "Review"); response = await fetch(`${base}/api/tasks/${draft.id as string}/jira/sync`, { method: "POST", headers, body: "{}" }); assert.equal(response.status, 200); assert.equal((await json(response)).status, "review");
+  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.deepEqual(snapshot.integrations, { jiraConfigured: true });
 });
 
 test("UI API runs a declarative Workflow", async (t) => {

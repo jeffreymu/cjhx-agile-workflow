@@ -16,6 +16,7 @@ function objectArg(args: JsonObject, key: string): JsonObject { const value = ar
 
 export class ToolBroker {
   constructor(private readonly adapters: ToolAdapters = {}) {}
+  hasAdapter(name: keyof ToolAdapters): boolean { return this.adapters[name] !== undefined; }
   async execute(operation: ToolOperation, permissions: Set<string>): Promise<JsonObject> {
     if (!permissions.has(operation.tool)) throw new PolicyDenied(`skill has no permission for tool: ${operation.tool}`);
     const a = this.adapters; let result: JsonValue;
@@ -43,6 +44,16 @@ export class ToolBroker {
     return { tool: operation.tool, result };
   }
   private need<T>(adapter: T | undefined, tool: string): T { if (!adapter) throw new AdapterError(`adapter is not configured for tool: ${tool}`); return adapter; }
+}
+
+export class InMemoryJiraAdapter implements JiraAdapter {
+  readonly issues = new Map<string, JsonObject>();
+  readonly transitions: { key: string; state: string }[] = [];
+  getIssue(key: string): JsonObject { const issue = this.issues.get(key); if (!issue) throw new AdapterError(`Jira issue not found: ${key}`); return { ...issue }; }
+  createIssue(fields: JsonObject): JsonObject { const key = String(fields.key ?? `TASK-${this.issues.size + 1}`); const issue = { key, status: "To Do", url: `jira://${key}`, ...fields }; this.issues.set(key, issue); return { ...issue }; }
+  updateIssue(key: string, fields: JsonObject): JsonObject { const issue = { ...this.getIssue(key), ...fields }; this.issues.set(key, issue); return { ...issue }; }
+  transitionIssue(key: string, state: string): JsonObject { const issue = { ...this.getIssue(key), status: state }; this.issues.set(key, issue); this.transitions.push({ key, state }); return { ...issue }; }
+  setStatus(key: string, status: string): void { const issue = { ...this.getIssue(key), status }; this.issues.set(key, issue); }
 }
 
 export class InMemoryConfluenceAdapter implements ConfluenceAdapter {
