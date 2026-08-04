@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cjhx.example/schemas/harness-rule-bundle.schema.json",
+  "title": "CJHX Harness Engineering Rule Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "version", "scope", "mode", "rules"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "$ref": "#/$defs/identifier" },
+    "version": { "$ref": "#/$defs/identifier" },
+    "scope": { "enum": ["enterprise", "workspace", "change", "task"] },
+    "mode": { "enum": ["enforce", "audit"] },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rule" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "stringSet": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "description": { "type": "string", "minLength": 1 },
+        "enabled": { "type": "boolean" },
+        "instruction": { "type": "string" },
+        "preconditions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["task.has-acceptance-criteria", "workspace.is-local"] }
+        },
+        "capabilities": { "$ref": "#/$defs/capabilities" },
+        "requiredChecks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["npm.typecheck", "npm.test", "npm.check"] }
+        },
+        "gates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/gate" }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "network": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode"],
+              "properties": { "mode": { "enum": ["none", "unrestricted"] } }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "allowedHosts"],
+              "properties": {
+                "mode": { "const": "allowlist" },
+                "allowedHosts": { "$ref": "#/$defs/stringSet", "minItems": 1 }
+              }
+            }
+          ]
+        },
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "commit": { "type": "boolean" },
+            "push": { "type": "boolean" },
+            "forcePush": { "type": "boolean" },
+            "destructiveOperations": { "type": "boolean" },
+            "createBranch": { "type": "boolean" }
+          }
+        },
+        "filesystem": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "writeRoots": { "$ref": "#/$defs/stringSet" },
+            "deniedPaths": { "$ref": "#/$defs/stringSet" }
+          }
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowed": { "$ref": "#/$defs/stringSet" },
+            "denied": { "$ref": "#/$defs/stringSet" }
+          }
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "requires"],
+      "properties": {
+        "target": {
+          "enum": [
+            "task.clarification",
+            "task.todo",
+            "task.in_progress",
+            "task.review",
+            "task.verification",
+            "task.done",
+            "task.blocked"
+          ]
+        },
+        "requires": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["check:npm.typecheck", "check:npm.test", "check:npm.check"]
+          }
+        }
+      }
+    }
+  }
+}

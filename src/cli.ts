@@ -24,6 +24,9 @@ Commands:
   skill-list
   skill-run ID --input JSON_OR_FILE [--change-id ID] [--approved]
   workflow-run FILE --input JSON_OR_FILE [--change-id ID] [--approve-step ID]
+  harness-validate FILE
+  harness-effective TASK_ID
+  harness-reports [--task-id TASK_ID]
   ui [--host 127.0.0.1] [--port 4317] [--no-open]
 `;
 
@@ -58,6 +61,9 @@ async function execute(parsed: Parsed): Promise<unknown> {
     case "skill-list": return app.registry.list();
     case "skill-run": return await app.runSkill(position(parsed, 0, "skill id"), loadPayload(option(parsed, "--input", true)!), { ...(option(parsed, "--change-id") ? { changeId: option(parsed, "--change-id")! } : {}), approved: parsed.flags.has("--approved") });
     case "workflow-run": return await app.runWorkflow(loadWorkflow(position(parsed, 0, "workflow file")), loadPayload(option(parsed, "--input", true)!), { ...(option(parsed, "--change-id") ? { changeId: option(parsed, "--change-id")! } : {}), approvedSteps: new Set(parsed.options.get("--approve-step") ?? []) });
+    case "harness-validate": return { valid: true, bundle: app.harness.validate(loadPayload(position(parsed, 0, "Harness rule file"))) };
+    case "harness-effective": return app.harness.effectiveForTask(position(parsed, 0, "task id"));
+    case "harness-reports": return app.harness.listReports(option(parsed, "--task-id"));
     case "ui": { const rawPort = option(parsed, "--port") ?? "4317"; const port = Number(rawPort); if (!Number.isInteger(port)) throw new Error(`invalid UI port: ${rawPort}`); const ui = createUiServer(app, { host: option(parsed, "--host") ?? "127.0.0.1", port, open: !parsed.flags.has("--no-open") }); return await ui.listen(); }
     default: throw new Error(usage);
   }

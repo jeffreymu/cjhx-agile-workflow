@@ -1,0 +1,30 @@
+{
+  "$schema": "./schemas/harness-rule-bundle.schema.json",
+  "schemaVersion": 1,
+  "id": "typescript-engineering",
+  "version": "1.0.0",
+  "scope": "workspace",
+  "mode": "enforce",
+  "rules": [
+    {
+      "id": "task-quality",
+      "description": "Require explicit acceptance criteria and project checks before verification",
+      "instruction": "Keep the implementation TypeScript-first, make the smallest safe change, and summarize validation.",
+      "preconditions": [
+        "workspace.is-local",
+        "task.has-acceptance-criteria"
+      ],
+      "requiredChecks": [
+        "npm.check"
+      ],
+      "gates": [
+        {
+          "target": "task.verification",
+          "requires": [
+            "check:npm.check"
+          ]
+        }
+      ]
+    }
+  ]
+}

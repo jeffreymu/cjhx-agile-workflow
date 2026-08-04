@@ -26,6 +26,7 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - DevOps 控制面：展示流水线和运行状态、制品版本、服务状态，并通过显式审批触发 CI/CD 或启停服务；
 - 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider；
 - 开发智能体配置：在 UI 中配置 Claude Code、Codex、Qoder（兼容 qorder 称呼）或自定义非交互式 CLI，多配置共存并选择默认 Agent；经人工批准后可从任务详情启动本地 Workspace 开发，并记录任务级 Agent Run；
+- Harness Engineering：从版本化 `cjhx.harness.json` 编译不可变规则快照，将 Agent 审批绑定 SHA-256 摘要，执行受批准的 postflight checks，分别记录 Agent 状态与合规状态，并以代码状态锁定的 Compliance Report 约束 Task 门禁；
 - Workspace Hub：以 Workspace 为范围提供 Overview、Kanban、Sessions、Team 和 Codebase 视图；Kanban 与全局任务看板复用同一投影和交互；支持导入/移除本地 Git 仓库，搜索文件，管理经审批的 worktree 与 Git refs，浏览并检查提交；
 - 虚拟 Workspace：无需克隆即可导入已配置的 GitLab/GitHub 仓库，实时浏览目录、文件、refs、提交、issue、PR/MR 和评论。
 
@@ -94,6 +95,7 @@ npm run ui
 ├── workspaces/         # 本地仓库引用和虚拟仓库元数据；不复制远端事实
 ├── agents/             # Agent CLI 配置；文件权限为 0600
 ├── agent-runs/         # 任务级 Agent 运行与输出；文件权限为 0600
+├── harness/            # 规则快照、合规报告与例外记录；文件权限为 0600
 └── integrations/       # 本地 Adapter 配置；凭据文件权限为 0600
 ```
 
@@ -134,6 +136,19 @@ cjhx skill-run my.skill --input @payload.json
 
 CLI 的 `--input` 接受 JSON 字符串或文件路径。Web 控制台的 Skill Library 还会扫描 Pi、Claude、Codex、Qoder 的用户/项目 Skill 目录；可通过 `CJHX_SKILL_PATHS` 增加企业目录。`SKILL.md` 启用后作为任务 Agent 指引，`skill.json` 启用后进入 CJHX Registry；禁用均不删除原始目录。外部可执行 Skill 默认禁用；生产使用应在独立沙箱中执行，并经过来源、许可证、依赖、数据外发、权限和质量评测。
 
+## Harness Engineering
+
+将项目级规则保存在 Git 仓库根目录的 `cjhx.harness.json`：
+
+```bash
+cp config/cjhx.harness.example.json cjhx.harness.json
+cjhx harness-validate cjhx.harness.json
+cjhx --workspace .cjhx harness-effective TASK_ID
+cjhx --workspace .cjhx harness-reports --task-id TASK_ID
+```
+
+当前本地进程执行器只真实保证参数数组、超时和输出上限；要求网络、文件系统或 Git 隔离的 enforce 规则会在 Agent 启动前拒绝，而不会仅靠 Prompt 冒充强制执行。详见 [Harness Engineering](docs/HARNESS_ENGINEERING.md)。
+
 ## 开发与测试
 
 ```bash
@@ -150,6 +165,7 @@ npm run check           # 完整检查
 - [Skill 开发与治理](docs/SKILLS.md)
 - [Jira、Confluence、代码托管、博云和观测适配](docs/INTEGRATIONS.md)
 - [可视化控制台](docs/UI.md)
+- [Harness Engineering 规则与门禁](docs/HARNESS_ENGINEERING.md)
 
 ## MVP 边界
 

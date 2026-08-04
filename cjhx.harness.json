@@ -1,0 +1,30 @@
+{
+  "$schema": "./schemas/harness-rule-bundle.schema.json",
+  "schemaVersion": 1,
+  "id": "cjhx-engineering",
+  "version": "1.0.0",
+  "scope": "workspace",
+  "mode": "enforce",
+  "rules": [
+    {
+      "id": "typescript-quality",
+      "description": "Require task context and the complete project check before verification",
+      "instruction": "Keep the framework TypeScript-first, preserve platform-neutral core contracts, add Node test coverage for behavior changes, and make the smallest safe change.",
+      "preconditions": [
+        "workspace.is-local",
+        "task.has-acceptance-criteria"
+      ],
+      "requiredChecks": [
+        "npm.check"
+      ],
+      "gates": [
+        {
+          "target": "task.verification",
+          "requires": [
+            "check:npm.check"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -7,6 +7,7 @@ export * from "./events.js";
 export * from "./framework.js";
 export * from "./github-config.js";
 export * from "./gitlab-config.js";
+export * from "./harness.js";
 export * from "./jira-config.js";
 export * from "./lifecycle.js";
 export * from "./local-skills.js";

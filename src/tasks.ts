@@ -66,7 +66,9 @@ function required(value: unknown, name: string): string { if (typeof value !== "
 function resultOf(value: JsonObject): JsonObject { const result = value.result; if (!isRecord(result)) throw new ValidationError("tool result must be an object"); return result as JsonObject; }
 
 export class TaskService {
+  private transitionGate?: (taskId: string, target: TaskStatus) => void;
   constructor(readonly workspace: Workspace, readonly tools: ToolBroker) {}
+  setTransitionGate(gate: (taskId: string, target: TaskStatus) => void): void { if (this.transitionGate) throw new ValidationError("task transition gate is already configured"); this.transitionGate = gate; }
 
   list(changeId?: string): Task[] { return this.workspace.listTasks().filter((task) => !changeId || task.changeId === changeId); }
   get(id: string): Task { return this.workspace.getTask(id); }
@@ -99,7 +101,7 @@ export class TaskService {
     const task = this.get(id); if (task.authority === "local-draft") return this.transition(id, target, options);
     this.ensureTransition(task, target); if (!options.approved) throw new PolicyDenied("Jira task transition requires explicit approval");
     const key = required(task.jiraIssueKey, "Jira issue key"); await this.tools.execute({ tool: "jira.issue.transition", arguments: { key, state: jiraNames[target] } }, new Set(["jira.issue.transition"]));
-    const moved = this.applyTransition(task, target, options); moved.jiraStatus = jiraNames[target]; moved.lastSyncedAt = utcNow(); this.workspace.saveTask(moved); return moved;
+    const moved = this.applyTransition(task, target, options, false); moved.jiraStatus = jiraNames[target]; moved.lastSyncedAt = utcNow(); this.workspace.saveTask(moved); return moved;
   }
 
   async publishToJira(id: string, options: { approved: boolean }): Promise<Task> {
@@ -115,9 +117,9 @@ export class TaskService {
     task.status = statusFromJira(rawStatus); task.jiraStatus = rawStatus; if (typeof result.summary === "string") task.title = result.summary; if (typeof result.assignee === "string") task.owner = result.assignee; if (typeof result.url === "string") task.jiraUrl = result.url; task.lastSyncedAt = utcNow(); task.updatedAt = utcNow(); this.workspace.saveTask(task); return task;
   }
 
-  private ensureTransition(task: Task, target: TaskStatus): void { if (!taskStatuses.includes(target)) throw new ValidationError(`invalid task status: ${target}`); if (!allowed[task.status].has(target)) throw new ValidationError(`cannot transition task from ${task.status} to ${target}`); }
-  private applyTransition(task: Task, target: TaskStatus, options: { actor: string; reason: string }): Task {
-    this.ensureTransition(task, target);
+  private ensureTransition(task: Task, target: TaskStatus): void { if (!taskStatuses.includes(target)) throw new ValidationError(`invalid task status: ${target}`); if (!allowed[task.status].has(target)) throw new ValidationError(`cannot transition task from ${task.status} to ${target}`); this.transitionGate?.(task.id, target); }
+  private applyTransition(task: Task, target: TaskStatus, options: { actor: string; reason: string }, enforceDynamicGate = true): Task {
+    if (enforceDynamicGate) this.ensureTransition(task, target); else { if (!taskStatuses.includes(target)) throw new ValidationError(`invalid task status: ${target}`); if (!allowed[task.status].has(target)) throw new ValidationError(`cannot transition task from ${task.status} to ${target}`); }
     const previous = task.status; task.status = target; task.updatedAt = utcNow(); task.history.push({ fromStatus: previous, toStatus: target, actor: required(options.actor, "actor"), reason: required(options.reason, "reason"), at: utcNow(), authority: task.authority }); this.workspace.saveTask(task); return task;
   }
 }

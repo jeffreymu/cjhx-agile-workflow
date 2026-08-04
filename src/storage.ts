@@ -21,6 +21,9 @@ export class Workspace {
   readonly agentRuns: string;
   readonly agentConfig: string;
   readonly localSkillConfig: string;
+  readonly harness: string;
+  readonly ruleSnapshots: string;
+  readonly complianceReports: string;
   readonly lockfile: string;
 
   constructor(root = ".cjhx") {
@@ -35,11 +38,14 @@ export class Workspace {
     this.agentRuns = resolve(this.root, "agent-runs");
     this.agentConfig = resolve(this.agents, "config.json");
     this.localSkillConfig = resolve(this.root, "local-skills.json");
+    this.harness = resolve(this.root, "harness");
+    this.ruleSnapshots = resolve(this.harness, "snapshots");
+    this.complianceReports = resolve(this.harness, "reports");
     this.lockfile = resolve(this.root, "skills-lock.json");
   }
 
   initialize(): void {
-    [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations, this.agents, this.agentRuns].forEach((path) => mkdirSync(path, { recursive: true }));
+    [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations, this.agents, this.agentRuns, this.harness, this.ruleSnapshots, this.complianceReports].forEach((path) => mkdirSync(path, { recursive: true }));
     if (!existsSync(this.lockfile)) this.writeJson(this.lockfile, { schemaVersion: 1, skills: {} });
   }
 
@@ -85,6 +91,11 @@ export class Workspace {
   saveAgentRun(run: AgentRun): void { this.initialize(); this.writePrivateJson(this.entityPath(this.agentRuns, run.id, "agent run id"), run as unknown as JsonValue); }
   getAgentRun(id: string): AgentRun { return this.readJson(this.entityPath(this.agentRuns, id, "agent run id")) as unknown as AgentRun; }
   listAgentRuns(): AgentRun[] { this.initialize(); return this.jsonFiles(this.agentRuns).map((path) => this.readJson(path) as unknown as AgentRun).sort((a, b) => b.startedAt.localeCompare(a.startedAt)); }
+  saveRuleSnapshot(value: { id: string }): void { this.initialize(); this.writePrivateJson(this.entityPath(this.ruleSnapshots, value.id, "rule snapshot id"), value as unknown as JsonValue); }
+  listRuleSnapshots<T>(): T[] { this.initialize(); return this.jsonFiles(this.ruleSnapshots).map((path) => this.readJson(path) as unknown as T); }
+  saveComplianceReport(value: { id: string }): void { this.initialize(); this.writePrivateJson(this.entityPath(this.complianceReports, value.id, "compliance report id"), value as unknown as JsonValue); }
+  getComplianceReport<T>(id: string): T { return this.readJson(this.entityPath(this.complianceReports, id, "compliance report id")) as unknown as T; }
+  listComplianceReports<T>(): T[] { this.initialize(); return this.jsonFiles(this.complianceReports).map((path) => this.readJson(path) as unknown as T); }
 
   private changePath(id: string): string { return this.entityPath(this.changes, id, "change id"); }
   private integrationPath(id: string): string { return this.entityPath(this.integrations, id, "integration id"); }
