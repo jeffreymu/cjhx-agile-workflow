@@ -49,6 +49,8 @@ GitHub configuration supports:
 - configurable GitHub API version;
 - repository reads, branch creation, Pull Request creation, and commit status publication.
 
+The same saved providers supply virtual Workspace browsing extensions. GitLab maps projects, repository tree/files, branches/tags, commits/statuses/diffs, issues, Merge Requests, and notes. GitHub maps repositories, contents, branches/tags, commits/statuses, issues, Pull Requests, general comments, and review comments. Importing a virtual Workspace stores only provider/repository/ref metadata under `.cjhx/workspaces/`; browse results remain live projections and are not persisted.
+
 Credentials are stored separately at `.cjhx/integrations/gitlab.json` and `.cjhx/integrations/github.json` with mode `0600`; UI responses expose only `credentialConfigured`. Production URLs require HTTPS, redirects are rejected, timeouts are bounded to 1–60 seconds, and responses are capped at 1 MB. Product names remain confined to these Adapter implementations and UI configuration; lifecycle and Skill contracts continue to use `SourceControlAdapter` and `scm.*` tools.
 
 ## BoCloud DevOps

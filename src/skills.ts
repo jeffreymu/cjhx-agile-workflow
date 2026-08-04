@@ -85,7 +85,7 @@ function parseResponse(value: unknown): SkillResponse {
 export class SkillRuntime {
   constructor(readonly workspace: Workspace, readonly registry: SkillRegistry, readonly policy: Policy, readonly tools = new ToolBroker()) {}
 
-  async run(skillId: string, payload: JsonObject, options: { changeId?: string; approved?: boolean } = {}): Promise<SkillRun> {
+  async run(skillId: string, payload: JsonObject, options: { changeId?: string; workspaceId?: string; approved?: boolean } = {}): Promise<SkillRun> {
     const { manifest, packagePath } = this.registry.resolve(skillId); this.policy.checkRun(manifest, options.approved ?? false);
     const id = `skill-run-${randomUUID().replaceAll("-", "")}`; const startedAt = utcNow();
     try {
@@ -93,10 +93,10 @@ export class SkillRuntime {
       const toolResults: JsonObject[] = [];
       for (const operation of response.operations) toolResults.push(await this.tools.execute(operation, new Set(manifest.permissions)));
       const output = toolResults.length ? { ...response.output, toolResults } : response.output;
-      const run: SkillRun = { id, skillId: manifest.id, skillVersion: manifest.version, ...(options.changeId ? { changeId: options.changeId } : {}), status: "succeeded", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, output: redact(output) as JsonObject, evidence: redact(response.evidence) as JsonObject[] };
+      const run: SkillRun = { id, skillId: manifest.id, skillVersion: manifest.version, ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), status: "succeeded", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, output: redact(output) as JsonObject, evidence: redact(response.evidence) as JsonObject[] };
       this.workspace.saveRun(run); return run;
     } catch (error) {
-      const run: SkillRun = { id, skillId: manifest.id, skillVersion: manifest.version, ...(options.changeId ? { changeId: options.changeId } : {}), status: "failed", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, output: {}, evidence: [], error: `${error instanceof Error ? error.name : "Error"}: ${error instanceof Error ? error.message : String(error)}` };
+      const run: SkillRun = { id, skillId: manifest.id, skillVersion: manifest.version, ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), status: "failed", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, output: {}, evidence: [], error: `${error instanceof Error ? error.name : "Error"}: ${error instanceof Error ? error.message : String(error)}` };
       this.workspace.saveRun(run); throw error;
     }
   }

@@ -37,7 +37,9 @@ The Web UI is an experience adapter over the same `CJHXFramework` facade and `.c
 
 DevOps pipeline, run, artifact, and service data is read as a live projection through `DevOpsService` and is not copied into `.cjhx`. Pipeline and service commands pass through the framework and `ToolBroker`; all such writes require explicit human approval, actor, and reason before the Adapter is invoked.
 
-Requirement decomposition output may be promoted into local task drafts under `.cjhx/tasks/`. Drafts have a CJHX-owned task state machine. Publishing a draft through `JiraAdapter` transfers task authority to Jira; the board then renders a synchronized projection, and status writes require explicit approval through `ToolBroker`.
+The Workspace Hub stores only repository references and display metadata under `.cjhx/workspaces/`. A local Workspace reads its canonical Git root and filesystem in real time. A virtual Workspace calls a configured GitLab or GitHub browser extension in real time and does not clone or persist repository trees, issues, change requests, or comments. Workspace-scoped views are projections: Overview summarizes repository health, Kanban projects local CJHX tasks or remote collaboration items, Sessions projects Skill/Workflow runs, Team aggregates declared owners/assignees, and Codebase provides repository browsing.
+
+Requirement decomposition output may be promoted into local task drafts under `.cjhx/tasks/`. Changes, tasks, and execution runs can carry `workspaceId` so Team, Kanban, and Sessions are explicitly scoped. Drafts have a CJHX-owned task state machine. Publishing a draft through `JiraAdapter` transfers task authority to Jira; the board then renders a synchronized projection, and status writes require explicit approval through `ToolBroker`.
 
 ## Change lifecycle
 
@@ -69,6 +71,10 @@ Process Skills are disabled by default. Production deployments should execute th
   ]
 }
 ```
+
+## Local repository safety
+
+`WorkspaceHub` invokes Git with `execFileSync` and argument arrays, never shell interpolation. Reads are constrained to the canonical repository root, reject escaping symlinks and binary/oversize previews, and exclude the active `.cjhx` state directory. Local worktree and ref mutations require an explicit approval flag. Removing a Workspace deletes only its CJHX reference, never the repository.
 
 ## Platform neutrality
 

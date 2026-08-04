@@ -10,7 +10,7 @@ import { Workspace } from "./storage.js";
 
 export interface WorkflowStep { id: string; skill: string; input: JsonObject }
 export interface WorkflowDefinition { id: string; version: string; name: string; steps: WorkflowStep[] }
-export interface WorkflowRun { id: string; workflowId: string; workflowVersion: string; status: "succeeded" | "failed"; startedAt: string; completedAt: string; input: JsonObject; steps: JsonObject[]; output: JsonObject; changeId?: string; error?: string }
+export interface WorkflowRun { id: string; workflowId: string; workflowVersion: string; workspaceId?: string; status: "succeeded" | "failed"; startedAt: string; completedAt: string; input: JsonObject; steps: JsonObject[]; output: JsonObject; changeId?: string; error?: string }
 
 export function loadWorkflow(path: string): WorkflowDefinition {
   return parseWorkflowDefinition(JSON.parse(readFileSync(path, "utf8")) as unknown);
@@ -27,18 +27,18 @@ export function parseWorkflowDefinition(value: unknown): WorkflowDefinition {
 
 export class WorkflowRuntime {
   constructor(readonly workspace: Workspace, readonly skills: SkillRuntime) {}
-  async run(definition: WorkflowDefinition, payload: JsonObject, options: { changeId?: string; approvedSteps?: Set<string> } = {}): Promise<WorkflowRun> {
+  async run(definition: WorkflowDefinition, payload: JsonObject, options: { changeId?: string; workspaceId?: string; approvedSteps?: Set<string> } = {}): Promise<WorkflowRun> {
     const id = `workflow-run-${randomUUID().replaceAll("-", "")}`; const startedAt = utcNow(); const context: JsonObject = { input: payload, steps: {} }; const records: JsonObject[] = [];
     try {
       for (const step of definition.steps) {
-        const resolved = this.resolve(step.input, context) as JsonObject; const run = await this.skills.run(step.skill, resolved, { ...(options.changeId ? { changeId: options.changeId } : {}), approved: options.approvedSteps?.has(step.id) ?? false });
+        const resolved = this.resolve(step.input, context) as JsonObject; const run = await this.skills.run(step.skill, resolved, { ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), approved: options.approvedSteps?.has(step.id) ?? false });
         (context.steps as JsonObject)[step.id] = { output: run.output, runId: run.id }; records.push({ id: step.id, skill: step.skill, skillRunId: run.id, status: run.status, output: run.output });
       }
       const last = definition.steps.at(-1); if (!last) throw new ValidationError("workflow has no steps");
-      const run: WorkflowRun = { id, workflowId: definition.id, workflowVersion: definition.version, ...(options.changeId ? { changeId: options.changeId } : {}), status: "succeeded", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, steps: redact(records) as JsonObject[], output: redact(((context.steps as JsonObject)[last.id] as JsonObject).output ?? {}) as JsonObject };
+      const run: WorkflowRun = { id, workflowId: definition.id, workflowVersion: definition.version, ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), status: "succeeded", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, steps: redact(records) as JsonObject[], output: redact(((context.steps as JsonObject)[last.id] as JsonObject).output ?? {}) as JsonObject };
       this.workspace.saveRun(run); return run;
     } catch (error) {
-      const run: WorkflowRun = { id, workflowId: definition.id, workflowVersion: definition.version, ...(options.changeId ? { changeId: options.changeId } : {}), status: "failed", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, steps: redact(records) as JsonObject[], output: {}, error: `${error instanceof Error ? error.name : "Error"}: ${error instanceof Error ? error.message : String(error)}` };
+      const run: WorkflowRun = { id, workflowId: definition.id, workflowVersion: definition.version, ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), status: "failed", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, steps: redact(records) as JsonObject[], output: {}, error: `${error instanceof Error ? error.name : "Error"}: ${error instanceof Error ? error.message : String(error)}` };
       this.workspace.saveRun(run); throw error;
     }
   }

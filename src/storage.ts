@@ -14,6 +14,7 @@ export class Workspace {
   readonly skills: string;
   readonly runs: string;
   readonly tasks: string;
+  readonly workspaces: string;
   readonly integrations: string;
   readonly lockfile: string;
 
@@ -23,12 +24,13 @@ export class Workspace {
     this.skills = resolve(this.root, "skills");
     this.runs = resolve(this.root, "runs");
     this.tasks = resolve(this.root, "tasks");
+    this.workspaces = resolve(this.root, "workspaces");
     this.integrations = resolve(this.root, "integrations");
     this.lockfile = resolve(this.root, "skills-lock.json");
   }
 
   initialize(): void {
-    [this.root, this.changes, this.skills, this.runs, this.tasks, this.integrations].forEach((path) => mkdirSync(path, { recursive: true }));
+    [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations].forEach((path) => mkdirSync(path, { recursive: true }));
     if (!existsSync(this.lockfile)) this.writeJson(this.lockfile, { schemaVersion: 1, skills: {} });
   }
 

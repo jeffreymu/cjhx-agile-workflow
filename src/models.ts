@@ -38,6 +38,7 @@ export interface TransitionRecord {
 
 export interface Change {
   id: string;
+  workspaceId?: string;
   title: string;
   owner: string;
   riskLevel: RiskLevel;
@@ -76,6 +77,7 @@ export interface SkillRun {
   skillId: string;
   skillVersion: string;
   changeId?: string;
+  workspaceId?: string;
   status: "succeeded" | "failed";
   startedAt: string;
   completedAt: string;
@@ -139,13 +141,13 @@ export function parseSkillManifest(value: unknown): SkillManifest {
 }
 
 export function createChange(input: {
-  id: string; title: string; owner: string; description?: string; riskLevel?: RiskLevel;
+  id: string; workspaceId?: string; title: string; owner: string; description?: string; riskLevel?: RiskLevel;
 }): Change {
   validateIdentifier(input.id, "change id", /^[A-Za-z0-9][A-Za-z0-9_-]*$/);
   if (!input.title.trim() || !input.owner.trim()) throw new ValidationError("change title and owner are required");
   const now = utcNow();
   return {
-    id: input.id, title: input.title, owner: input.owner,
+    id: input.id, ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}), title: input.title, owner: input.owner,
     riskLevel: input.riskLevel ?? "L1", state: "intent_draft",
     description: input.description ?? "", links: {}, metadata: {}, evidence: [], history: [],
     createdAt: now, updatedAt: now,

@@ -14,4 +14,5 @@ export * from "./skills.js";
 export * from "./source-control-config.js";
 export * from "./tasks.js";
 export * from "./workflows.js";
+export * from "./workspace-hub.js";
 export * from "./ui.js";

@@ -43,7 +43,7 @@ function send(response: ServerResponse, status: number, value: unknown): void {
 function snapshot(app: CJHXFramework): JsonObject {
   const changes = app.workspace.listChanges().map((change) => ({ ...change, nextTransitions: availableTransitions(change) }));
   const skills = app.registry.list().map((locked) => ({ ...locked, manifest: app.registry.resolve(locked.id).manifest }));
-  return { workspace: app.workspace.root, changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira"), jiraConfig: app.jiraIntegration.summary(), devopsConfigured: app.devops.configured(), devopsConfig: app.devopsIntegration.summary(), sourceControl: app.sourceControlIntegration.summary(), gitLabConfig: app.gitLabIntegration.summary(), gitHubConfig: app.gitHubIntegration.summary() } } as unknown as JsonObject;
+  return { workspace: app.workspace.root, workspaces: app.workspaceHub.list(), changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira"), jiraConfig: app.jiraIntegration.summary(), devopsConfigured: app.devops.configured(), devopsConfig: app.devopsIntegration.summary(), sourceControl: app.sourceControlIntegration.summary(), gitLabConfig: app.gitLabIntegration.summary(), gitHubConfig: app.gitHubIntegration.summary() } } as unknown as JsonObject;
 }
 
 function openBrowser(url: string): void {
@@ -69,6 +69,15 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "GET" && path in assetTypes) { const content = readFileSync(resolve(assets, path.slice(1))); response.writeHead(200, { "content-type": assetTypes[path], "content-length": content.length, "cache-control": "no-cache", "x-content-type-options": "nosniff" }); response.end(content); return; }
       if (method === "GET" && path === "/api/snapshot") { send(response, 200, snapshot(app)); return; }
       if (method === "GET" && path === "/api/devops/overview") { send(response, 200, await app.devops.overview(optionalText(url.searchParams.get("changeId")))); return; }
+      let workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)\/(overview|kanban|sessions|team|tree|file|search|refs|commits|worktrees|issues|change-requests)$/);
+      if (method === "GET" && workspaceMatch && request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; }
+      if (method === "GET" && workspaceMatch?.[1] && workspaceMatch[2]) { const id = decode(workspaceMatch[1]); const action = workspaceMatch[2]; const ref = optionalText(url.searchParams.get("ref")); const itemPath = url.searchParams.get("path") ?? ""; const result = action === "overview" ? await app.workspaceHub.overview(id) : action === "kanban" ? await app.workspaceHub.kanban(id) : action === "sessions" ? app.workspaceHub.sessions(id) : action === "team" ? await app.workspaceHub.team(id) : action === "tree" ? await app.workspaceHub.tree(id, itemPath, ref) : action === "file" ? await app.workspaceHub.file(id, text(itemPath, "path"), ref) : action === "search" ? app.workspaceHub.search(id, text(url.searchParams.get("q"), "q")) : action === "refs" ? await app.workspaceHub.refs(id) : action === "commits" ? await app.workspaceHub.commits(id, ref) : action === "worktrees" ? app.workspaceHub.worktrees(id) : action === "issues" ? await app.workspaceHub.issues(id) : await app.workspaceHub.changeRequests(id); send(response, 200, result); return; }
+      workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)\/commits\/([^/]+)\/check$/);
+      if (method === "GET" && workspaceMatch && request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; }
+      if (method === "GET" && workspaceMatch?.[1] && workspaceMatch[2]) { send(response, 200, await app.workspaceHub.inspectCommit(decode(workspaceMatch[1]), decode(workspaceMatch[2]))); return; }
+      workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)\/(issues|change-requests)\/(\d+)\/comments$/);
+      if (method === "GET" && workspaceMatch && request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; }
+      if (method === "GET" && workspaceMatch?.[1] && workspaceMatch[2] && workspaceMatch[3]) { send(response, 200, await app.workspaceHub.comments(decode(workspaceMatch[1]), workspaceMatch[2] === "issues" ? "issue" : "change-request", Number(workspaceMatch[3]))); return; }
       if (method === "GET" && path === "/api/jira/config") { send(response, 200, app.jiraIntegration.summary()); return; }
       if (method === "GET" && path === "/api/gitlab/config") { send(response, 200, app.gitLabIntegration.summary()); return; }
       if (method === "GET" && path === "/api/github/config") { send(response, 200, app.gitHubIntegration.summary()); return; }
@@ -76,9 +85,20 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method !== "GET" && request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; }
 
       const input = method === "GET" ? {} : await body(request);
+      if (method === "POST" && path === "/api/workspaces") { const kind = text(input.kind, "kind"); if (kind === "local") send(response, 201, app.workspaceHub.addLocal({ path: text(input.path, "path"), ...(optionalText(input.name) ? { name: optionalText(input.name) } : {}) })); else if (kind === "virtual") { const provider = text(input.provider, "provider"); if (provider !== "gitlab" && provider !== "github") throw new ValidationError("provider must be gitlab or github"); send(response, 201, await app.workspaceHub.addVirtual({ provider, repositoryId: text(input.repositoryId, "repositoryId"), ...(optionalText(input.name) ? { name: optionalText(input.name) } : {}), ...(optionalText(input.defaultRef) ? { defaultRef: optionalText(input.defaultRef) } : {}) })); } else throw new ValidationError("kind must be local or virtual"); return; }
+      workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)$/);
+      if (method === "DELETE" && workspaceMatch?.[1]) { app.workspaceHub.remove(decode(workspaceMatch[1])); send(response, 200, { removed: true }); return; }
+      workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)\/refs$/);
+      if (method === "POST" && workspaceMatch?.[1]) { const type = text(input.type, "type"); if (type !== "branch" && type !== "tag") throw new ValidationError("type must be branch or tag"); send(response, 201, app.workspaceHub.createRef(decode(workspaceMatch[1]), { name: text(input.name, "name"), revision: text(input.revision, "revision"), type, approved: input.approved === true })); return; }
+      workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)\/refs\/delete$/);
+      if (method === "POST" && workspaceMatch?.[1]) { const type = text(input.type, "type"); if (type !== "branch" && type !== "tag") throw new ValidationError("type must be branch or tag"); send(response, 200, app.workspaceHub.deleteRef(decode(workspaceMatch[1]), { name: text(input.name, "name"), type, approved: input.approved === true })); return; }
+      workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)\/worktrees$/);
+      if (method === "POST" && workspaceMatch?.[1]) { send(response, 201, app.workspaceHub.addWorktree(decode(workspaceMatch[1]), { path: text(input.path, "path"), ref: text(input.ref, "ref"), ...(optionalText(input.createBranch) ? { createBranch: optionalText(input.createBranch) } : {}), approved: input.approved === true })); return; }
+      workspaceMatch = path.match(/^\/api\/workspaces\/([^/]+)\/worktrees\/remove$/);
+      if (method === "POST" && workspaceMatch?.[1]) { send(response, 200, app.workspaceHub.removeWorktree(decode(workspaceMatch[1]), { path: text(input.path, "path"), approved: input.approved === true })); return; }
       if (method === "POST" && path === "/api/changes") {
         const risk = optionalText(input.riskLevel) ?? "L1"; if (!riskLevels.includes(risk as RiskLevel)) throw new ValidationError(`invalid risk level: ${risk}`);
-        const change = app.createChange(text(input.id, "id"), text(input.title, "title"), text(input.owner, "owner"), { ...(optionalText(input.description) ? { description: optionalText(input.description) } : {}), riskLevel: risk as RiskLevel }); send(response, 201, change); return;
+        const change = app.createChange(text(input.id, "id"), text(input.title, "title"), text(input.owner, "owner"), { ...(optionalText(input.workspaceId) ? { workspaceId: optionalText(input.workspaceId) } : {}), ...(optionalText(input.description) ? { description: optionalText(input.description) } : {}), riskLevel: risk as RiskLevel }); send(response, 201, change); return;
       }
       let match = path.match(/^\/api\/changes\/([^/]+)\/evidence$/);
       if (method === "POST" && match?.[1]) { const evidence = app.addEvidence(decode(match[1]), { kind: text(input.kind, "kind"), source: text(input.source, "source"), status: text(input.status, "status"), subjectRef: text(input.subjectRef, "subjectRef"), ...(optionalText(input.uri) ? { uri: optionalText(input.uri) } : {}) }); send(response, 201, evidence); return; }
@@ -125,7 +145,7 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "POST" && path === "/api/tasks") {
         const priority = optionalText(input.priority) ?? "P2"; const riskLevel = optionalText(input.riskLevel) ?? "L1"; const status = optionalText(input.status) ?? "todo";
         if (!taskPriorities.includes(priority as TaskPriority)) throw new ValidationError(`invalid task priority: ${priority}`); if (!riskLevels.includes(riskLevel as RiskLevel)) throw new ValidationError(`invalid task risk: ${riskLevel}`); if (!taskStatuses.includes(status as TaskStatus)) throw new ValidationError(`invalid task status: ${status}`);
-        const task = app.createTask({ changeId: text(input.changeId, "changeId"), title: text(input.title, "title"), ...(optionalText(input.description) ? { description: optionalText(input.description) } : {}), ...(optionalText(input.owner) ? { owner: optionalText(input.owner) } : {}), priority: priority as TaskPriority, riskLevel: riskLevel as RiskLevel, status: status as TaskStatus, acceptanceCriteria: stringArray(input.acceptanceCriteria), dependencies: stringArray(input.dependencies), evidenceRefs: stringArray(input.evidenceRefs) }); send(response, 201, task); return;
+        const task = app.createTask({ changeId: text(input.changeId, "changeId"), ...(optionalText(input.workspaceId) ? { workspaceId: optionalText(input.workspaceId) } : {}), title: text(input.title, "title"), ...(optionalText(input.description) ? { description: optionalText(input.description) } : {}), ...(optionalText(input.owner) ? { owner: optionalText(input.owner) } : {}), priority: priority as TaskPriority, riskLevel: riskLevel as RiskLevel, status: status as TaskStatus, acceptanceCriteria: stringArray(input.acceptanceCriteria), dependencies: stringArray(input.dependencies), evidenceRefs: stringArray(input.evidenceRefs) }); send(response, 201, task); return;
       }
       match = path.match(/^\/api\/runs\/([^/]+)\/tasks\/import$/);
       if (method === "POST" && match?.[1]) { send(response, 201, app.importTasksFromRun(decode(match[1]), text(input.changeId, "changeId"))); return; }
@@ -137,10 +157,10 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "POST" && match?.[1]) { send(response, 200, await app.syncTaskFromJira(decode(match[1]))); return; }
       if (method === "POST" && path === "/api/skills/install") { send(response, 201, app.installSkill(text(input.packagePath, "packagePath"))); return; }
       match = path.match(/^\/api\/skills\/([^/]+)\/runs$/);
-      if (method === "POST" && match?.[1]) { const run = await app.runSkill(decode(match[1]), object(input.input, "input"), { ...(optionalText(input.changeId) ? { changeId: optionalText(input.changeId) } : {}), approved: input.approved === true }); send(response, 201, run); return; }
+      if (method === "POST" && match?.[1]) { const run = await app.runSkill(decode(match[1]), object(input.input, "input"), { ...(optionalText(input.changeId) ? { changeId: optionalText(input.changeId) } : {}), ...(optionalText(input.workspaceId) ? { workspaceId: optionalText(input.workspaceId) } : {}), approved: input.approved === true }); send(response, 201, run); return; }
       if (method === "POST" && path === "/api/workflows/runs") {
         const approved = Array.isArray(input.approvedSteps) ? input.approvedSteps.filter((item): item is string => typeof item === "string") : [];
-        const run = await app.runWorkflow(parseWorkflowDefinition(input.definition), object(input.input, "input"), { ...(optionalText(input.changeId) ? { changeId: optionalText(input.changeId) } : {}), approvedSteps: new Set(approved) }); send(response, 201, run); return;
+        const run = await app.runWorkflow(parseWorkflowDefinition(input.definition), object(input.input, "input"), { ...(optionalText(input.changeId) ? { changeId: optionalText(input.changeId) } : {}), ...(optionalText(input.workspaceId) ? { workspaceId: optionalText(input.workspaceId) } : {}), approvedSteps: new Set(approved) }); send(response, 201, run); return;
       }
       send(response, 404, { error: "route not found" });
     } catch (error) { send(response, error instanceof CJHXError ? 400 : 500, { error: error instanceof Error ? error.message : String(error) }); }

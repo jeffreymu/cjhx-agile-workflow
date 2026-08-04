@@ -53,16 +53,24 @@ The UI supports:
 15. triggering approved CI/CD runs and approved service start, stop, or restart actions through `DevOpsAdapter`;
 16. testing, saving, updating, and removing standard HTTP Jira and DevOps Gateway configurations without exposing stored credentials;
 17. reviewing configured integrations and their redacted connection summaries from a dedicated Integration Settings page;
-18. configuring GitLab and GitHub independently, and selecting which saved provider currently supplies the platform-neutral `SourceControlAdapter`.
+18. configuring GitLab and GitHub independently, and selecting which saved provider currently supplies the platform-neutral `SourceControlAdapter`;
+19. importing local Git repositories as managed Workspaces and switching among Workspace-scoped Overview, Kanban, Sessions, Team, and Codebase views;
+20. browsing local directory trees and UTF-8 files, searching filenames/content, listing worktrees and refs, and inspecting commits;
+21. creating/removing local worktrees, branches, and tags with explicit human approval;
+22. importing configured GitLab/GitHub repositories as virtual Workspaces without cloning them;
+23. browsing remote directory trees, files, refs, commits, issue, PR/MR, and comments as live Provider projections.
 
 ## Security boundary
 
 The built-in UI is a local SDK/MVP control surface, not an internet-facing enterprise gateway.
 
 - The server only accepts `127.0.0.1`, `::1`, or `localhost` bindings and rejects non-loopback `Host` headers to prevent DNS rebinding.
-- A random per-process token is embedded in the initial HTML and required in `X-CJHX-UI-Token` for every mutation.
+- A random per-process token is embedded in the initial HTML and required in `X-CJHX-UI-Token` for every mutation and every repository/issue/PR browsing endpoint.
 - Responses use a restrictive Content Security Policy, deny framing, disable caching for state, and set `X-Content-Type-Options: nosniff`.
 - Request bodies are limited to 1 MB.
+- Local file browsing is confined to the canonical Git root, rejects symlinks that escape it, excludes `.git`, dependencies/build output from search, limits previews to 1 MB, and never exposes the active `.cjhx` state directory or Adapter credentials.
+- Worktree and Git-ref mutations require explicit human approval; commands use `execFile` argument arrays rather than a shell.
+- Virtual Workspace data is read live through the saved Provider Adapter. It is not persisted as a second issue, PR, comment, or repository truth.
 - The UI cannot skip lifecycle evidence gates.
 - Local task drafts use a controlled transition graph. Once published, Jira is authoritative and Jira transitions require explicit approval.
 - DevOps reads are live Adapter projections. Pipeline triggers and service controls require explicit approval, actor, and reason; an unconfigured Adapter leaves these actions unavailable.

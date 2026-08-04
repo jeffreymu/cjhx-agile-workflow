@@ -24,7 +24,9 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - 可视化 Web 控制台：变更导航、12 阶段时间线、证据门禁、Skills、Workflows 和运行记录；
 - 需求拆解任务看板：本地草稿、七阶段状态、验收/依赖/证据详情、筛选，以及受审批约束的 Jira 发布与同步投影；
 - DevOps 控制面：展示流水线和运行状态、制品版本、服务状态，并通过显式审批触发 CI/CD 或启停服务；
-- 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider。
+- 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider；
+- Workspace Hub：以 Workspace 为范围提供 Overview、Kanban、Sessions、Team 和 Codebase 视图；支持导入/移除本地 Git 仓库，搜索文件，管理经审批的 worktree 与 Git refs，浏览并检查提交；
+- 虚拟 Workspace：无需克隆即可导入已配置的 GitLab/GitHub 仓库，实时浏览目录、文件、refs、提交、issue、PR/MR 和评论。
 
 ## 工具职责
 
@@ -87,10 +89,11 @@ npm run ui
 ├── skills-lock.json    # 版本与摘要锁定
 ├── runs/               # Skill 和 Workflow 执行记录
 ├── tasks/              # 未发布任务草稿和 Jira 任务状态投影
+├── workspaces/         # 本地仓库引用和虚拟仓库元数据；不复制远端事实
 └── integrations/       # 本地 Adapter 配置；凭据文件权限为 0600
 ```
 
-业务事实仍保存在其权威平台中；`.cjhx` 不复制 Jira、Confluence 或博云的完整业务数据。
+业务事实仍保存在其权威平台中；`.cjhx` 不复制 Jira、Confluence、DevOps 或代码托管平台的完整业务数据。虚拟 Workspace 每次通过对应 Adapter 实时读取远端投影。
 
 ## 生命周期门禁示例
 

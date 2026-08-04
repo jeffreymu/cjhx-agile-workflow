@@ -23,6 +23,7 @@ export interface TaskHistory {
 export interface Task {
   id: string;
   changeId: string;
+  workspaceId?: string;
   title: string;
   description: string;
   owner: string;
@@ -70,12 +71,12 @@ export class TaskService {
   list(changeId?: string): Task[] { return this.workspace.listTasks().filter((task) => !changeId || task.changeId === changeId); }
   get(id: string): Task { return this.workspace.getTask(id); }
 
-  create(input: { changeId: string; title: string; description?: string; owner?: string; priority?: TaskPriority; riskLevel?: RiskLevel; status?: TaskStatus; acceptanceCriteria?: string[]; dependencies?: string[]; evidenceRefs?: string[]; sourceRunId?: string; sourceTaskId?: string }): Task {
+  create(input: { changeId: string; workspaceId?: string; title: string; description?: string; owner?: string; priority?: TaskPriority; riskLevel?: RiskLevel; status?: TaskStatus; acceptanceCriteria?: string[]; dependencies?: string[]; evidenceRefs?: string[]; sourceRunId?: string; sourceTaskId?: string }): Task {
     this.workspace.getChange(input.changeId);
     if (input.priority && !taskPriorities.includes(input.priority)) throw new ValidationError(`invalid task priority: ${input.priority}`);
     if (input.riskLevel && !riskLevels.includes(input.riskLevel)) throw new ValidationError(`invalid task risk level: ${input.riskLevel}`);
     if (input.status && !taskStatuses.includes(input.status)) throw new ValidationError(`invalid task status: ${input.status}`);
-    const now = utcNow(); const task: Task = { id: `task-${randomUUID().replaceAll("-", "")}`, changeId: input.changeId, title: required(input.title, "task title"), description: input.description?.trim() ?? "", owner: input.owner?.trim() || "unassigned", priority: input.priority ?? "P2", riskLevel: input.riskLevel ?? "L1", status: input.status ?? "todo", authority: "local-draft", acceptanceCriteria: input.acceptanceCriteria ?? [], dependencies: input.dependencies ?? [], evidenceRefs: input.evidenceRefs ?? [], ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}), ...(input.sourceTaskId ? { sourceTaskId: input.sourceTaskId } : {}), history: [], createdAt: now, updatedAt: now };
+    const now = utcNow(); const task: Task = { id: `task-${randomUUID().replaceAll("-", "")}`, changeId: input.changeId, ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}), title: required(input.title, "task title"), description: input.description?.trim() ?? "", owner: input.owner?.trim() || "unassigned", priority: input.priority ?? "P2", riskLevel: input.riskLevel ?? "L1", status: input.status ?? "todo", authority: "local-draft", acceptanceCriteria: input.acceptanceCriteria ?? [], dependencies: input.dependencies ?? [], evidenceRefs: input.evidenceRefs ?? [], ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}), ...(input.sourceTaskId ? { sourceTaskId: input.sourceTaskId } : {}), history: [], createdAt: now, updatedAt: now };
     this.workspace.saveTask(task); return task;
   }
 
@@ -86,7 +87,7 @@ export class TaskService {
     const existing = this.list(changeId).filter((task) => task.sourceRunId === runId); if (existing.length) return existing;
     return run.output.tasks.map((raw, index) => {
       if (!isRecord(raw)) throw new ValidationError("decomposed task must be an object");
-      return this.create({ changeId, title: required(raw.title, "task title"), description: typeof raw.description === "string" ? raw.description : "", owner: typeof raw.owner === "string" ? raw.owner : undefined, priority: taskPriorities.includes(raw.priority as TaskPriority) ? raw.priority as TaskPriority : "P2", riskLevel: riskLevels.includes(raw.riskLevel as RiskLevel) ? raw.riskLevel as RiskLevel : "L1", acceptanceCriteria: strings(raw.acceptanceCriteria), dependencies: strings(raw.dependencies), sourceRunId: runId, sourceTaskId: typeof raw.id === "string" ? raw.id : `TASK-${index + 1}` });
+      return this.create({ changeId, ...(typeof run.workspaceId === "string" ? { workspaceId: run.workspaceId } : {}), title: required(raw.title, "task title"), description: typeof raw.description === "string" ? raw.description : "", owner: typeof raw.owner === "string" ? raw.owner : undefined, priority: taskPriorities.includes(raw.priority as TaskPriority) ? raw.priority as TaskPriority : "P2", riskLevel: riskLevels.includes(raw.riskLevel as RiskLevel) ? raw.riskLevel as RiskLevel : "L1", acceptanceCriteria: strings(raw.acceptanceCriteria), dependencies: strings(raw.dependencies), sourceRunId: runId, sourceTaskId: typeof raw.id === "string" ? raw.id : `TASK-${index + 1}` });
     });
   }
 
