@@ -28,6 +28,11 @@ test("UI serves the control surface and workspace snapshot", async (t) => {
   const body = await json(response); assert.deepEqual(body.changes, []); assert.deepEqual(body.skills, []); assert.deepEqual(body.runs, []);
 });
 
+test("UI stylesheet keeps long pages inside visible scroll containers", async (t) => {
+  const { base } = await fixture(t); const response = await fetch(`${base}/styles.css`); assert.equal(response.status, 200); const css = await response.text();
+  assert.match(css, /\.main\{[^}]*min-height:0/); assert.match(css, /\.content\{[^}]*min-height:0[^}]*overflow:auto/); assert.match(css, /\.scrollbar,.modal[^}]*\{scrollbar-width:thin;scrollbar-color:var\(--border\) transparent/); assert.match(css, /\.modal\{[^}]*scrollbar-gutter:stable/);
+});
+
 test("UI rejects non-loopback Host headers", async (t) => {
   const { base } = await fixture(t);
   const result = await new Promise<{ status: number; body: string }>((accept, reject) => {
