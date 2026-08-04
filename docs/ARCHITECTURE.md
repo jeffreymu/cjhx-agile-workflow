@@ -18,7 +18,7 @@ CJHX Agile Workflow is a TypeScript-first, platform-neutral, skill-driven Agenti
 ## Runtime boundaries
 
 ```text
-Experience: Jira / Confluence / IDE / CLI
+Experience: Jira / Confluence / IDE / CLI / CJHX Web UI
                  |
 Control plane: lifecycle + workflow + policy + context
                  |
@@ -30,6 +30,8 @@ Adapters: Jira / Confluence / source control / DevOps / observability
 ```
 
 The framework never gives platform credentials to a Skill. A Skill emits requested `operations`; `ToolBroker` verifies each operation against the immutable manifest permission list and invokes a configured adapter.
+
+The Web UI is an experience adapter over the same `CJHXFramework` facade and `.cjhx` workspace. It does not maintain a parallel lifecycle or evidence store. Its local HTTP server is loopback-only and requires an ephemeral per-process token for mutations.
 
 ## Change lifecycle
 

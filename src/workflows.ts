@@ -13,7 +13,10 @@ export interface WorkflowDefinition { id: string; version: string; name: string;
 export interface WorkflowRun { id: string; workflowId: string; workflowVersion: string; status: "succeeded" | "failed"; startedAt: string; completedAt: string; input: JsonObject; steps: JsonObject[]; output: JsonObject; changeId?: string; error?: string }
 
 export function loadWorkflow(path: string): WorkflowDefinition {
-  const value = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  return parseWorkflowDefinition(JSON.parse(readFileSync(path, "utf8")) as unknown);
+}
+
+export function parseWorkflowDefinition(value: unknown): WorkflowDefinition {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.version !== "string" || typeof value.name !== "string" || !Array.isArray(value.steps) || !value.steps.length) throw new ValidationError("workflow requires id, version, name, and non-empty steps");
   const seen = new Set<string>(); const steps = value.steps.map((raw): WorkflowStep => {
     if (!isRecord(raw) || typeof raw.id !== "string" || typeof raw.skill !== "string" || !isRecord(raw.input)) throw new ValidationError("each workflow step requires id, skill, and input");

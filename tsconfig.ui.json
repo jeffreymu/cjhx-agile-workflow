@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "rootDir": "ui",
+    "outDir": "dist/ui",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": ["ui/app.ts"]
+}

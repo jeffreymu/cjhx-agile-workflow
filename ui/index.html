@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="cjhx-ui-token" content="__CJHX_UI_TOKEN__">
+  <title>CJHX Agile Workflow</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <aside class="sidebar">
+      <header class="brand"><span class="brand-mark">C</span><span><strong>CJHX</strong><small>Agile Workflow</small></span></header>
+      <nav class="primary-nav" aria-label="主导航">
+        <button class="nav-item active" data-view="changes"><span class="nav-icon">⌘</span><span>研发变更</span><span class="nav-count" id="change-count">0</span></button>
+        <button class="nav-item" data-view="skills"><span class="nav-icon">◇</span><span>Skills</span><span class="nav-count" id="skill-count">0</span></button>
+        <button class="nav-item" data-view="runs"><span class="nav-icon">↯</span><span>运行记录</span><span class="nav-count" id="run-count">0</span></button>
+      </nav>
+      <section class="sidebar-section">
+        <div class="section-heading"><span>工作项</span><button class="icon-button" id="new-change" title="创建变更" aria-label="创建变更">＋</button></div>
+        <label class="search"><span>⌕</span><input id="change-search" type="search" placeholder="搜索变更…" autocomplete="off"><kbd id="search-key">⌘K</kbd></label>
+        <div id="change-list" class="change-list scrollbar"></div>
+      </section>
+      <footer class="sidebar-footer"><span class="health-dot"></span><span>本地控制面</span><button class="icon-button" id="theme-toggle" title="切换主题" aria-label="切换主题">◐</button></footer>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumbs"><span class="muted">工作区</span><span>/</span><strong id="page-title">研发变更</strong></div>
+        <div class="topbar-actions"><span id="sync-state" class="sync-state"><i></i> 已连接</span><button class="button secondary" id="install-skill">安装 Skill</button><button class="button primary" id="primary-action">创建变更</button></div>
+      </header>
+      <div id="content" class="content scrollbar" aria-live="polite"></div>
+    </main>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root" aria-live="assertive"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

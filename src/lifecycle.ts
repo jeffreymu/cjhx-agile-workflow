@@ -34,6 +34,12 @@ export function missingEvidence(change: Change, target: LifecycleState): string[
   return [...(requiredEvidence[target] ?? [])].filter((kind) => !present.has(kind));
 }
 
+export interface AvailableTransition { target: LifecycleState; missingEvidence: string[] }
+
+export function availableTransitions(change: Change): AvailableTransition[] {
+  return [...allowed[change.state]].map((target) => ({ target, missingEvidence: missingEvidence(change, target) }));
+}
+
 export function transition(change: Change, target: LifecycleState, options: {
   actor: string; reason: string; evidenceIds?: string[]; enforceGates?: boolean;
 }): Change {

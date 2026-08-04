@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ValidationError } from "./errors.js";
@@ -39,10 +39,16 @@ export class Workspace {
     catch (error) { throw new ValidationError(`cannot read JSON ${path}: ${error instanceof Error ? error.message : String(error)}`); }
   }
 
-  saveChange(change: Change): void { this.initialize(); this.writeJson(resolve(this.changes, `${change.id}.json`), change as unknown as JsonValue); }
-  getChange(id: string): Change { return this.readJson(resolve(this.changes, `${id}.json`)) as unknown as Change; }
-  changeExists(id: string): boolean { return existsSync(resolve(this.changes, `${id}.json`)); }
+  saveChange(change: Change): void { this.initialize(); this.writeJson(this.changePath(change.id), change as unknown as JsonValue); }
+  getChange(id: string): Change { return this.readJson(this.changePath(id)) as unknown as Change; }
+  listChanges(): Change[] { this.initialize(); return this.jsonFiles(this.changes).map((path) => this.readJson(path) as unknown as Change).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
+  changeExists(id: string): boolean { return existsSync(this.changePath(id)); }
   saveRun(run: SkillRun | { id: string }): void { this.initialize(); this.writeJson(resolve(this.runs, `${run.id}.json`), run as unknown as JsonValue); }
+  listRuns(): JsonValue[] { this.initialize(); return this.jsonFiles(this.runs).map((path) => this.readJson(path)).sort((a, b) => this.runTime(b).localeCompare(this.runTime(a))); }
   getLock(): SkillLock { this.initialize(); return this.readJson(this.lockfile) as unknown as SkillLock; }
   saveLock(lock: SkillLock): void { this.writeJson(this.lockfile, lock as unknown as JsonValue); }
+
+  private changePath(id: string): string { if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id)) throw new ValidationError("change id contains unsupported characters"); return resolve(this.changes, `${id}.json`); }
+  private jsonFiles(directory: string): string[] { return readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).map((entry) => resolve(directory, entry.name)); }
+  private runTime(value: JsonValue): string { return typeof value === "object" && value !== null && !Array.isArray(value) && typeof value.completedAt === "string" ? value.completedAt : ""; }
 }

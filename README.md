@@ -20,7 +20,8 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - Jira、Confluence、代码托管平台、博云 DevOps 和未来运行观测的适配器契约；
 - 权限检查后的 ToolBroker，Skill 不直接获得平台凭据；
 - 需求拆解、测试用例生成、代码评审、API 测试执行、Jira→Confluence 同步示例；
-- CLI、JSON 文件状态存储和执行审计记录。
+- CLI、JSON 文件状态存储和执行审计记录；
+- 可视化 Web 控制台：变更导航、12 阶段时间线、证据门禁、Skills、Workflows 和运行记录。
 
 ## 工具职责
 
@@ -63,6 +64,16 @@ cjhx workflow-run examples/requirement-to-tests.workflow.json \
     "acceptanceCriteria":["返回每个订单的处理结果"]
   }'
 ```
+
+### 启动可视化控制台
+
+```bash
+cjhx --workspace .cjhx ui
+# 或在源码仓库中
+npm run ui
+```
+
+控制台默认打开 `http://127.0.0.1:4317`。可使用 `--port` 更换端口，或用 `--no-open` 禁止自动打开浏览器。服务器仅允许监听回环地址；所有写请求都需要页面会话 Token。详见 [UI 使用与安全边界](docs/UI.md)。
 
 框架状态默认保存到 `.cjhx/`：
 
@@ -126,6 +137,7 @@ npm run check           # 完整检查
 - [架构与边界](docs/ARCHITECTURE.md)
 - [Skill 开发与治理](docs/SKILLS.md)
 - [Jira、Confluence、代码托管、博云和观测适配](docs/INTEGRATIONS.md)
+- [可视化控制台](docs/UI.md)
 
 ## MVP 边界
 

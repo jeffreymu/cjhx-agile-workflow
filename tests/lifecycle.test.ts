@@ -36,4 +36,6 @@ test("duplicate change does not overwrite existing state", (t) => {
 test("change id cannot escape workspace", (t) => {
   const { app, cleanup } = fixture(); t.after(cleanup);
   assert.throws(() => app.createChange("../escape", "非法", "owner"), ValidationError);
+  assert.throws(() => app.workspace.getChange("../escape"), ValidationError);
+  assert.throws(() => app.addEvidence("../escape", { kind: "approval", source: "jira", status: "approved", subjectRef: "jira://escape" }), ValidationError);
 });

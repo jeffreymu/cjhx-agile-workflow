@@ -6,6 +6,7 @@ import { CJHXFramework } from "./framework.js";
 import type { JsonObject, LifecycleState, RiskLevel } from "./models.js";
 import { lifecycleStates, riskLevels } from "./models.js";
 import { Policy } from "./policy.js";
+import { createUiServer } from "./ui.js";
 import { loadWorkflow } from "./workflows.js";
 
 interface Parsed { workspace: string; allowProcessSkills: boolean; command: string; positional: string[]; options: Map<string, string[]>; flags: Set<string> }
@@ -23,6 +24,7 @@ Commands:
   skill-list
   skill-run ID --input JSON_OR_FILE [--change-id ID] [--approved]
   workflow-run FILE --input JSON_OR_FILE [--change-id ID] [--approve-step ID]
+  ui [--host 127.0.0.1] [--port 4317] [--no-open]
 `;
 
 function parse(argv: string[]): Parsed {
@@ -56,6 +58,7 @@ async function execute(parsed: Parsed): Promise<unknown> {
     case "skill-list": return app.registry.list();
     case "skill-run": return await app.runSkill(position(parsed, 0, "skill id"), loadPayload(option(parsed, "--input", true)!), { ...(option(parsed, "--change-id") ? { changeId: option(parsed, "--change-id")! } : {}), approved: parsed.flags.has("--approved") });
     case "workflow-run": return await app.runWorkflow(loadWorkflow(position(parsed, 0, "workflow file")), loadPayload(option(parsed, "--input", true)!), { ...(option(parsed, "--change-id") ? { changeId: option(parsed, "--change-id")! } : {}), approvedSteps: new Set(parsed.options.get("--approve-step") ?? []) });
+    case "ui": { const rawPort = option(parsed, "--port") ?? "4317"; const port = Number(rawPort); if (!Number.isInteger(port)) throw new Error(`invalid UI port: ${rawPort}`); const ui = createUiServer(app, { host: option(parsed, "--host") ?? "127.0.0.1", port, open: !parsed.flags.has("--no-open") }); return await ui.listen(); }
     default: throw new Error(usage);
   }
 }
