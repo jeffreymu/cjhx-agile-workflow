@@ -50,7 +50,10 @@ The UI supports:
 12. transitioning local tasks through a guarded task state machine;
 13. publishing approved drafts to Jira and synchronizing Jira-owned task projections when a Jira Adapter is configured;
 14. viewing DevOps pipelines, recent CI/CD runs, artifacts, and service state;
-15. triggering approved CI/CD runs and approved service start, stop, or restart actions through `DevOpsAdapter`.
+15. triggering approved CI/CD runs and approved service start, stop, or restart actions through `DevOpsAdapter`;
+16. testing, saving, updating, and removing standard HTTP Jira and DevOps Gateway configurations without exposing stored credentials;
+17. reviewing configured integrations and their redacted connection summaries from a dedicated Integration Settings page;
+18. configuring GitLab and GitHub independently, and selecting which saved provider currently supplies the platform-neutral `SourceControlAdapter`.
 
 ## Security boundary
 

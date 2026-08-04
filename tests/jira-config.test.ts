@@ -1,0 +1,19 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+import test from "node:test";
+import { ToolBroker } from "../src/adapters.js";
+import { ValidationError } from "../src/errors.js";
+import { JiraIntegrationManager } from "../src/jira-config.js";
+import { Workspace } from "../src/storage.js";
+
+async function gateway(t: test.TestContext) { const seen: { url?: string; method?: string; authorization?: string; body?: string }[] = []; const server = createServer((request, response) => { let body = ""; request.on("data", (chunk: Buffer) => { body += chunk.toString(); }); request.on("end", () => { seen.push({ url: request.url, method: request.method, ...(request.headers.authorization ? { authorization: request.headers.authorization } : {}), ...(body ? { body } : {}) }); response.writeHead(200, { "content-type": "application/json" }); response.end(request.url === "/health" ? '{"status":"ok"}' : request.method === "POST" && request.url === "/issues" ? '{"key":"PAY-1","status":"To Do"}' : '{"key":"PAY-1","status":"In Progress"}'); }); }); await new Promise<void>((accept) => server.listen(0, "127.0.0.1", accept)); t.after(() => server.close()); const address = server.address(); if (!address || typeof address === "string") throw new Error("missing address"); return { url: `http://127.0.0.1:${address.port}`, seen }; }
+function fixture(t: test.TestContext) { const root = mkdtempSync(resolve(tmpdir(), "cjhx-jira-config-")); t.after(() => rmSync(root, { recursive: true, force: true })); const workspace = new Workspace(resolve(root, ".cjhx")); workspace.initialize(); const tools = new ToolBroker(); return { workspace, tools, manager: new JiraIntegrationManager(workspace, tools) }; }
+
+test("Jira configuration saves privately, redacts credentials, and enables operations", async (t) => { const remote = await gateway(t); const { workspace, tools, manager } = fixture(t); const summary = await manager.save({ baseUrl: remote.url, authType: "bearer", credential: "jira-secret", projectKey: "PAY", issueType: "Sub-task", timeoutSeconds: 5 }); assert.equal(summary.configured, true); assert.equal(summary.credentialConfigured, true); assert.equal("credential" in summary, false); assert.equal(statSync(resolve(workspace.integrations, "jira.json")).mode & 0o777, 0o600); assert.match(readFileSync(resolve(workspace.integrations, "jira.json"), "utf8"), /jira-secret/); const adapter = tools.getAdapter("jira"); assert.ok(adapter); await adapter.createIssue({ summary: "Task" }); const create = remote.seen.at(-1); assert.equal(create?.authorization, "Bearer jira-secret"); assert.match(create?.body ?? "", /"projectKey":"PAY"/); assert.match(create?.body ?? "", /"issueType":"Sub-task"/); });
+
+test("Jira configuration can retain credential and be removed", async (t) => { const remote = await gateway(t); const { workspace, tools, manager } = fixture(t); await manager.save({ baseUrl: remote.url, authType: "basic", credential: "encoded-basic" }); const updated = await manager.save({ baseUrl: remote.url, authType: "basic", projectKey: "OPS" }); assert.equal(updated.projectKey, "OPS"); tools.removeAdapter("jira"); new JiraIntegrationManager(workspace, tools); assert.equal(tools.hasAdapter("jira"), true); assert.equal(manager.remove().configured, false); });
+
+test("Jira configuration rejects unsafe URLs and headers", async (t) => { const { manager } = fixture(t); await assert.rejects(manager.test({ baseUrl: "http://jira.example", authType: "none" }), ValidationError); await assert.rejects(manager.test({ baseUrl: "https://jira.example", authType: "api-key", credential: "key", apiKeyHeader: "Cookie" }), ValidationError); });

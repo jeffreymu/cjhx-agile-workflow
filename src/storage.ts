@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ValidationError } from "./errors.js";
@@ -14,6 +14,7 @@ export class Workspace {
   readonly skills: string;
   readonly runs: string;
   readonly tasks: string;
+  readonly integrations: string;
   readonly lockfile: string;
 
   constructor(root = ".cjhx") {
@@ -22,11 +23,12 @@ export class Workspace {
     this.skills = resolve(this.root, "skills");
     this.runs = resolve(this.root, "runs");
     this.tasks = resolve(this.root, "tasks");
+    this.integrations = resolve(this.root, "integrations");
     this.lockfile = resolve(this.root, "skills-lock.json");
   }
 
   initialize(): void {
-    [this.root, this.changes, this.skills, this.runs, this.tasks].forEach((path) => mkdirSync(path, { recursive: true }));
+    [this.root, this.changes, this.skills, this.runs, this.tasks, this.integrations].forEach((path) => mkdirSync(path, { recursive: true }));
     if (!existsSync(this.lockfile)) this.writeJson(this.lockfile, { schemaVersion: 1, skills: {} });
   }
 
@@ -35,6 +37,11 @@ export class Workspace {
     const temporary = `${path}.${randomUUID()}.tmp`;
     writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, "utf8");
     renameSync(temporary, path);
+  }
+
+  writePrivateJson(path: string, value: JsonValue): void {
+    mkdirSync(dirname(path), { recursive: true }); const temporary = `${path}.${randomUUID()}.tmp`;
+    writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }); renameSync(temporary, path); chmodSync(path, 0o600);
   }
 
   readJson<T extends JsonValue>(path: string): T {
@@ -54,8 +61,13 @@ export class Workspace {
   listTasks(): Task[] { this.initialize(); return this.jsonFiles(this.tasks).map((path) => this.readJson(path) as unknown as Task).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
   getLock(): SkillLock { this.initialize(); return this.readJson(this.lockfile) as unknown as SkillLock; }
   saveLock(lock: SkillLock): void { this.writeJson(this.lockfile, lock as unknown as JsonValue); }
+  integrationExists(id: string): boolean { return existsSync(this.integrationPath(id)); }
+  getIntegrationConfig(id: string): JsonValue { return this.readJson(this.integrationPath(id)); }
+  saveIntegrationConfig(id: string, value: JsonValue): void { this.initialize(); this.writePrivateJson(this.integrationPath(id), value); }
+  removeIntegrationConfig(id: string): void { rmSync(this.integrationPath(id), { force: true }); }
 
   private changePath(id: string): string { return this.entityPath(this.changes, id, "change id"); }
+  private integrationPath(id: string): string { return this.entityPath(this.integrations, id, "integration id"); }
   private entityPath(directory: string, id: string, label: string): string { if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id)) throw new ValidationError(`${label} contains unsupported characters`); return resolve(directory, `${id}.json`); }
   private jsonFiles(directory: string): string[] { return readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).map((entry) => resolve(directory, entry.name)); }
   private runTime(value: JsonValue): string { return typeof value === "object" && value !== null && !Array.isArray(value) && typeof value.completedAt === "string" ? value.completedAt : ""; }

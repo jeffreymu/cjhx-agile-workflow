@@ -1,19 +1,24 @@
 import { randomUUID } from "node:crypto";
 import type { ToolBroker } from "./adapters.js";
+import { DevOpsIntegrationManager } from "./devops-config.js";
 import { DevOpsService } from "./devops.js";
 import { ValidationError } from "./errors.js";
+import { GitHubIntegrationManager } from "./github-config.js";
+import { GitLabIntegrationManager } from "./gitlab-config.js";
+import { JiraIntegrationManager } from "./jira-config.js";
 import { transition } from "./lifecycle.js";
 import { createChange, type Change, type Evidence, type JsonObject, type LifecycleState, type RiskLevel, utcNow } from "./models.js";
 import { Policy } from "./policy.js";
 import { SkillRegistry, SkillRuntime } from "./skills.js";
+import { SourceControlIntegrationManager } from "./source-control-config.js";
 import { Workspace } from "./storage.js";
 import { TaskService, type TaskPriority, type TaskStatus } from "./tasks.js";
 import { WorkflowRuntime, type WorkflowDefinition, type WorkflowRun } from "./workflows.js";
 
 export class CJHXFramework {
-  readonly workspace: Workspace; readonly policy: Policy; readonly registry: SkillRegistry; readonly runtime: SkillRuntime; readonly workflows: WorkflowRuntime; readonly tasks: TaskService; readonly devops: DevOpsService;
+  readonly workspace: Workspace; readonly policy: Policy; readonly registry: SkillRegistry; readonly runtime: SkillRuntime; readonly workflows: WorkflowRuntime; readonly tasks: TaskService; readonly devops: DevOpsService; readonly devopsIntegration: DevOpsIntegrationManager; readonly jiraIntegration: JiraIntegrationManager; readonly sourceControlIntegration: SourceControlIntegrationManager; readonly gitLabIntegration: GitLabIntegrationManager; readonly gitHubIntegration: GitHubIntegrationManager;
   constructor(workspace = ".cjhx", options: { policy?: Policy; tools?: ToolBroker } = {}) {
-    this.workspace = new Workspace(workspace); this.policy = options.policy ?? new Policy(); this.registry = new SkillRegistry(this.workspace, this.policy); this.runtime = new SkillRuntime(this.workspace, this.registry, this.policy, options.tools); this.workflows = new WorkflowRuntime(this.workspace, this.runtime); this.tasks = new TaskService(this.workspace, this.runtime.tools); this.devops = new DevOpsService(this.runtime.tools);
+    this.workspace = new Workspace(workspace); this.policy = options.policy ?? new Policy(); this.registry = new SkillRegistry(this.workspace, this.policy); this.runtime = new SkillRuntime(this.workspace, this.registry, this.policy, options.tools); this.workflows = new WorkflowRuntime(this.workspace, this.runtime); this.tasks = new TaskService(this.workspace, this.runtime.tools); this.devops = new DevOpsService(this.runtime.tools); this.devopsIntegration = new DevOpsIntegrationManager(this.workspace, this.runtime.tools); this.jiraIntegration = new JiraIntegrationManager(this.workspace, this.runtime.tools); this.sourceControlIntegration = new SourceControlIntegrationManager(this.workspace, this.runtime.tools); this.gitLabIntegration = new GitLabIntegrationManager(this.workspace, this.sourceControlIntegration); this.gitHubIntegration = new GitHubIntegrationManager(this.workspace, this.sourceControlIntegration);
   }
   initialize(): void { this.workspace.initialize(); }
   createChange(id: string, title: string, owner: string, options: { description?: string; riskLevel?: RiskLevel } = {}): Change {

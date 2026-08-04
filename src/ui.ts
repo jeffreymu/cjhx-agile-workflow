@@ -43,7 +43,7 @@ function send(response: ServerResponse, status: number, value: unknown): void {
 function snapshot(app: CJHXFramework): JsonObject {
   const changes = app.workspace.listChanges().map((change) => ({ ...change, nextTransitions: availableTransitions(change) }));
   const skills = app.registry.list().map((locked) => ({ ...locked, manifest: app.registry.resolve(locked.id).manifest }));
-  return { workspace: app.workspace.root, changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira"), devopsConfigured: app.devops.configured() } } as unknown as JsonObject;
+  return { workspace: app.workspace.root, changes, tasks: app.listTasks(), skills, runs: app.workspace.listRuns(), lifecycleStates: [...lifecycleStates], integrations: { jiraConfigured: app.runtime.tools.hasAdapter("jira"), jiraConfig: app.jiraIntegration.summary(), devopsConfigured: app.devops.configured(), devopsConfig: app.devopsIntegration.summary(), sourceControl: app.sourceControlIntegration.summary(), gitLabConfig: app.gitLabIntegration.summary(), gitHubConfig: app.gitHubIntegration.summary() } } as unknown as JsonObject;
 }
 
 function openBrowser(url: string): void {
@@ -69,6 +69,10 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "GET" && path in assetTypes) { const content = readFileSync(resolve(assets, path.slice(1))); response.writeHead(200, { "content-type": assetTypes[path], "content-length": content.length, "cache-control": "no-cache", "x-content-type-options": "nosniff" }); response.end(content); return; }
       if (method === "GET" && path === "/api/snapshot") { send(response, 200, snapshot(app)); return; }
       if (method === "GET" && path === "/api/devops/overview") { send(response, 200, await app.devops.overview(optionalText(url.searchParams.get("changeId")))); return; }
+      if (method === "GET" && path === "/api/jira/config") { send(response, 200, app.jiraIntegration.summary()); return; }
+      if (method === "GET" && path === "/api/gitlab/config") { send(response, 200, app.gitLabIntegration.summary()); return; }
+      if (method === "GET" && path === "/api/github/config") { send(response, 200, app.gitHubIntegration.summary()); return; }
+      if (method === "GET" && path === "/api/devops/config") { send(response, 200, app.devopsIntegration.summary()); return; }
       if (method !== "GET" && request.headers["x-cjhx-ui-token"] !== token) { send(response, 403, { error: "invalid UI session token" }); return; }
 
       const input = method === "GET" ? {} : await body(request);
@@ -80,6 +84,36 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "POST" && match?.[1]) { const evidence = app.addEvidence(decode(match[1]), { kind: text(input.kind, "kind"), source: text(input.source, "source"), status: text(input.status, "status"), subjectRef: text(input.subjectRef, "subjectRef"), ...(optionalText(input.uri) ? { uri: optionalText(input.uri) } : {}) }); send(response, 201, evidence); return; }
       match = path.match(/^\/api\/changes\/([^/]+)\/transitions$/);
       if (method === "POST" && match?.[1]) { const target = text(input.target, "target"); if (!lifecycleStates.includes(target as LifecycleState)) throw new ValidationError(`invalid lifecycle state: ${target}`); const change = app.transitionChange(decode(match[1]), target as LifecycleState, { actor: text(input.actor, "actor"), reason: text(input.reason, "reason") }); send(response, 200, change); return; }
+      if (method === "POST" && path === "/api/gitlab/config/test") {
+        send(response, 200, await app.gitLabIntegration.test({ baseUrl: text(input.baseUrl, "baseUrl"), authType: text(input.authType, "authType") as "none" | "private-token" | "bearer" | "job-token", ...(optionalText(input.credential) ? { credential: optionalText(input.credential) } : {}), ...(optionalText(input.apiPath) ? { apiPath: optionalText(input.apiPath) } : {}), ...(optionalText(input.projectId) ? { projectId: optionalText(input.projectId) } : {}), ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: Number(input.timeoutSeconds) } : {}) })); return;
+      }
+      if (method === "PUT" && path === "/api/gitlab/config") {
+        send(response, 200, await app.gitLabIntegration.save({ baseUrl: text(input.baseUrl, "baseUrl"), authType: text(input.authType, "authType") as "none" | "private-token" | "bearer" | "job-token", ...(optionalText(input.credential) ? { credential: optionalText(input.credential) } : {}), ...(optionalText(input.apiPath) ? { apiPath: optionalText(input.apiPath) } : {}), ...(optionalText(input.projectId) ? { projectId: optionalText(input.projectId) } : {}), ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: Number(input.timeoutSeconds) } : {}) })); return;
+      }
+      if (method === "POST" && path === "/api/gitlab/config/activate") { send(response, 200, app.gitLabIntegration.activate()); return; }
+      if (method === "DELETE" && path === "/api/gitlab/config") { send(response, 200, app.gitLabIntegration.remove()); return; }
+      if (method === "POST" && path === "/api/github/config/test") {
+        send(response, 200, await app.gitHubIntegration.test({ baseUrl: text(input.baseUrl, "baseUrl"), authType: text(input.authType, "authType") as "none" | "bearer" | "token", ...(optionalText(input.credential) ? { credential: optionalText(input.credential) } : {}), ...(input.apiPath !== undefined ? { apiPath: typeof input.apiPath === "string" ? input.apiPath : "" } : {}), ...(optionalText(input.repository) ? { repository: optionalText(input.repository) } : {}), ...(optionalText(input.apiVersion) ? { apiVersion: optionalText(input.apiVersion) } : {}), ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: Number(input.timeoutSeconds) } : {}) })); return;
+      }
+      if (method === "PUT" && path === "/api/github/config") {
+        send(response, 200, await app.gitHubIntegration.save({ baseUrl: text(input.baseUrl, "baseUrl"), authType: text(input.authType, "authType") as "none" | "bearer" | "token", ...(optionalText(input.credential) ? { credential: optionalText(input.credential) } : {}), ...(input.apiPath !== undefined ? { apiPath: typeof input.apiPath === "string" ? input.apiPath : "" } : {}), ...(optionalText(input.repository) ? { repository: optionalText(input.repository) } : {}), ...(optionalText(input.apiVersion) ? { apiVersion: optionalText(input.apiVersion) } : {}), ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: Number(input.timeoutSeconds) } : {}) })); return;
+      }
+      if (method === "POST" && path === "/api/github/config/activate") { send(response, 200, app.gitHubIntegration.activate()); return; }
+      if (method === "DELETE" && path === "/api/github/config") { send(response, 200, app.gitHubIntegration.remove()); return; }
+      if (method === "POST" && path === "/api/jira/config/test") {
+        send(response, 200, await app.jiraIntegration.test({ baseUrl: text(input.baseUrl, "baseUrl"), authType: text(input.authType, "authType") as "none" | "bearer" | "api-key" | "basic", ...(optionalText(input.credential) ? { credential: optionalText(input.credential) } : {}), ...(optionalText(input.apiKeyHeader) ? { apiKeyHeader: optionalText(input.apiKeyHeader) } : {}), ...(optionalText(input.projectKey) ? { projectKey: optionalText(input.projectKey) } : {}), ...(optionalText(input.issueType) ? { issueType: optionalText(input.issueType) } : {}), ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: Number(input.timeoutSeconds) } : {}) })); return;
+      }
+      if (method === "PUT" && path === "/api/jira/config") {
+        send(response, 200, await app.jiraIntegration.save({ baseUrl: text(input.baseUrl, "baseUrl"), authType: text(input.authType, "authType") as "none" | "bearer" | "api-key" | "basic", ...(optionalText(input.credential) ? { credential: optionalText(input.credential) } : {}), ...(optionalText(input.apiKeyHeader) ? { apiKeyHeader: optionalText(input.apiKeyHeader) } : {}), ...(optionalText(input.projectKey) ? { projectKey: optionalText(input.projectKey) } : {}), ...(optionalText(input.issueType) ? { issueType: optionalText(input.issueType) } : {}), ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: Number(input.timeoutSeconds) } : {}) })); return;
+      }
+      if (method === "DELETE" && path === "/api/jira/config") { send(response, 200, app.jiraIntegration.remove()); return; }
+      if (method === "POST" && path === "/api/devops/config/test") {
+        send(response, 200, await app.devopsIntegration.test({ baseUrl: text(input.baseUrl, "baseUrl"), authType: text(input.authType, "authType") as "none" | "bearer" | "api-key", ...(optionalText(input.credential) ? { credential: optionalText(input.credential) } : {}), ...(optionalText(input.apiKeyHeader) ? { apiKeyHeader: optionalText(input.apiKeyHeader) } : {}), ...(optionalText(input.projectId) ? { projectId: optionalText(input.projectId) } : {}), ...(optionalText(input.tenantId) ? { tenantId: optionalText(input.tenantId) } : {}), ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: Number(input.timeoutSeconds) } : {}) })); return;
+      }
+      if (method === "PUT" && path === "/api/devops/config") {
+        send(response, 200, await app.devopsIntegration.save({ baseUrl: text(input.baseUrl, "baseUrl"), authType: text(input.authType, "authType") as "none" | "bearer" | "api-key", ...(optionalText(input.credential) ? { credential: optionalText(input.credential) } : {}), ...(optionalText(input.apiKeyHeader) ? { apiKeyHeader: optionalText(input.apiKeyHeader) } : {}), ...(optionalText(input.projectId) ? { projectId: optionalText(input.projectId) } : {}), ...(optionalText(input.tenantId) ? { tenantId: optionalText(input.tenantId) } : {}), ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: Number(input.timeoutSeconds) } : {}) })); return;
+      }
+      if (method === "DELETE" && path === "/api/devops/config") { send(response, 200, app.devopsIntegration.remove()); return; }
       if (method === "POST" && path === "/api/devops/pipelines/trigger") {
         const kind = text(input.kind, "kind"); if (!pipelineKinds.includes(kind as PipelineKind)) throw new ValidationError(`invalid pipeline kind: ${kind}`);
         send(response, 202, await app.devops.triggerPipeline({ pipelineId: text(input.pipelineId, "pipelineId"), kind: kind as PipelineKind, ...(optionalText(input.changeId) ? { changeId: optionalText(input.changeId) } : {}), ...(optionalText(input.ref) ? { ref: optionalText(input.ref) } : {}), ...(optionalText(input.environment) ? { environment: optionalText(input.environment) } : {}), actor: text(input.actor, "actor"), reason: text(input.reason, "reason"), approved: input.approved === true })); return;

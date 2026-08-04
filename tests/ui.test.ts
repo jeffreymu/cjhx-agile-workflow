@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
-import { request as httpRequest } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -77,7 +77,7 @@ test("UI API creates, imports, and transitions board tasks", async (t) => {
   await fetch(`${base}/api/skills/install`, { method: "POST", headers, body: JSON.stringify({ packagePath: resolve(process.cwd(), "examples/skills/requirement-decompose") }) });
   response = await fetch(`${base}/api/skills/requirement.decompose/runs`, { method: "POST", headers, body: JSON.stringify({ changeId: "PAY-3", input: { requirement: "实现审计；补充文档" } }) }); const run = await json(response);
   response = await fetch(`${base}/api/runs/${run.id as string}/tasks/import`, { method: "POST", headers, body: JSON.stringify({ changeId: "PAY-3" }) }); assert.equal(response.status, 201); assert.equal((await response.json() as unknown[]).length, 2);
-  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.equal((snapshot.tasks as unknown[]).length, 3); assert.deepEqual(snapshot.integrations, { jiraConfigured: false, devopsConfigured: false });
+  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.equal((snapshot.tasks as unknown[]).length, 3); assert.deepEqual(snapshot.integrations, { jiraConfigured: false, jiraConfig: { configured: false, source: "none", credentialConfigured: false }, devopsConfigured: false, devopsConfig: { configured: false, source: "none", credentialConfigured: false }, sourceControl: { configured: false, source: "none" }, gitLabConfig: { configured: false, active: false, source: "none", credentialConfigured: false }, gitHubConfig: { configured: false, active: false, source: "none", credentialConfigured: false } });
 });
 
 test("UI API publishes and synchronizes Jira-owned tasks", async (t) => {
@@ -87,7 +87,34 @@ test("UI API publishes and synchronizes Jira-owned tasks", async (t) => {
   response = await fetch(`${base}/api/tasks/${draft.id as string}/jira/publish`, { method: "POST", headers, body: JSON.stringify({ approved: false }) }); assert.equal(response.status, 400);
   response = await fetch(`${base}/api/tasks/${draft.id as string}/jira/publish`, { method: "POST", headers, body: JSON.stringify({ approved: true }) }); assert.equal(response.status, 200); const published = await json(response); assert.equal(published.authority, "jira");
   jira.setStatus(published.jiraIssueKey as string, "Review"); response = await fetch(`${base}/api/tasks/${draft.id as string}/jira/sync`, { method: "POST", headers, body: "{}" }); assert.equal(response.status, 200); assert.equal((await json(response)).status, "review");
-  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.deepEqual(snapshot.integrations, { jiraConfigured: true, devopsConfigured: false });
+  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.deepEqual(snapshot.integrations, { jiraConfigured: true, jiraConfig: { configured: true, source: "runtime", credentialConfigured: false }, devopsConfigured: false, devopsConfig: { configured: false, source: "none", credentialConfigured: false }, sourceControl: { configured: false, source: "none" }, gitLabConfig: { configured: false, active: false, source: "none", credentialConfigured: false }, gitHubConfig: { configured: false, active: false, source: "none", credentialConfigured: false } });
+});
+
+test("UI API tests, saves, redacts, and removes Jira configuration", async (t) => {
+  const gateway = createServer((request, response) => { response.writeHead(200, { "content-type": "application/json" }); response.end(request.url === "/health" ? '{"status":"ok"}' : '{"key":"PAY-10","status":"To Do"}'); }); await new Promise<void>((accept) => gateway.listen(0, "127.0.0.1", accept)); t.after(() => gateway.close()); const address = gateway.address(); if (!address || typeof address === "string") throw new Error("missing gateway address");
+  const { base, ui } = await fixture(t); const headers = { "content-type": "application/json", "x-cjhx-ui-token": ui.token }; const config = { baseUrl: `http://127.0.0.1:${address.port}`, authType: "bearer", credential: "jira-token", projectKey: "PAY", issueType: "Task", timeoutSeconds: 5 };
+  let response = await fetch(`${base}/api/jira/config/test`, { method: "POST", headers, body: JSON.stringify(config) }); assert.equal(response.status, 200);
+  response = await fetch(`${base}/api/jira/config`, { method: "PUT", headers, body: JSON.stringify(config) }); assert.equal(response.status, 200); const summary = await json(response); assert.equal(summary.configured, true); assert.equal(summary.credentialConfigured, true); assert.equal("credential" in summary, false);
+  await fetch(`${base}/api/changes`, { method: "POST", headers, body: JSON.stringify({ id: "PAY-10", title: "Configured Jira", owner: "product" }) }); response = await fetch(`${base}/api/tasks`, { method: "POST", headers, body: JSON.stringify({ changeId: "PAY-10", title: "Publish", owner: "backend" }) }); const task = await json(response); response = await fetch(`${base}/api/tasks/${task.id as string}/jira/publish`, { method: "POST", headers, body: JSON.stringify({ approved: true }) }); assert.equal(response.status, 200); assert.equal((await json(response)).authority, "jira");
+  response = await fetch(`${base}/api/jira/config`, { method: "DELETE", headers, body: "{}" }); assert.equal(response.status, 200); assert.equal((await json(response)).configured, false);
+});
+
+test("UI API configures and switches GitLab and GitHub adapters", async (t) => {
+  const gateway = createServer((_request, response) => { response.writeHead(200, { "content-type": "application/json" }); response.end('{"id":1,"name":"repo","full_name":"owner/repo"}'); }); await new Promise<void>((accept) => gateway.listen(0, "127.0.0.1", accept)); t.after(() => gateway.close()); const address = gateway.address(); if (!address || typeof address === "string") throw new Error("missing gateway address");
+  const { base, ui } = await fixture(t); const headers = { "content-type": "application/json", "x-cjhx-ui-token": ui.token }; const endpoint = `http://127.0.0.1:${address.port}`;
+  let response = await fetch(`${base}/api/gitlab/config`, { method: "PUT", headers, body: JSON.stringify({ baseUrl: endpoint, apiPath: "/api/v4", authType: "private-token", credential: "gl-secret", projectId: "42", timeoutSeconds: 5 }) }); assert.equal(response.status, 200); assert.equal((await json(response)).active, true);
+  response = await fetch(`${base}/api/github/config`, { method: "PUT", headers, body: JSON.stringify({ baseUrl: endpoint, apiPath: "", authType: "bearer", credential: "gh-secret", repository: "owner/repo", timeoutSeconds: 5 }) }); assert.equal(response.status, 200); assert.equal((await json(response)).active, true);
+  let snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.equal((snapshot.integrations as Record<string, Record<string, unknown>>).sourceControl?.activeProvider, "github"); assert.equal((snapshot.integrations as Record<string, Record<string, unknown>>).gitLabConfig?.credentialConfigured, true); assert.equal("credential" in ((snapshot.integrations as Record<string, Record<string, unknown>>).gitHubConfig ?? {}), false);
+  response = await fetch(`${base}/api/gitlab/config/activate`, { method: "POST", headers, body: "{}" }); assert.equal(response.status, 200); snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.equal((snapshot.integrations as Record<string, Record<string, unknown>>).sourceControl?.activeProvider, "gitlab");
+});
+
+test("UI API tests, saves, redacts, and removes DevOps configuration", async (t) => {
+  const gateway = createServer((request, response) => { response.writeHead(200, { "content-type": "application/json" }); response.end(request.url === "/health" ? '{"status":"ok"}' : "[]"); }); await new Promise<void>((accept) => gateway.listen(0, "127.0.0.1", accept)); t.after(() => gateway.close()); const address = gateway.address(); if (!address || typeof address === "string") throw new Error("missing gateway address");
+  const { base, ui } = await fixture(t); const headers = { "content-type": "application/json", "x-cjhx-ui-token": ui.token }; const config = { baseUrl: `http://127.0.0.1:${address.port}`, authType: "bearer", credential: "secret-token", projectId: "PAY", timeoutSeconds: 5 };
+  let response = await fetch(`${base}/api/devops/config/test`, { method: "POST", headers, body: JSON.stringify(config) }); assert.equal(response.status, 200); assert.equal((await json(response)).status, "connected");
+  response = await fetch(`${base}/api/devops/config`, { method: "PUT", headers, body: JSON.stringify(config) }); assert.equal(response.status, 200); const summary = await json(response); assert.equal(summary.configured, true); assert.equal(summary.credentialConfigured, true); assert.equal("credential" in summary, false);
+  response = await fetch(`${base}/api/devops/config`); assert.equal(response.status, 200); assert.equal("credential" in await json(response), false);
+  response = await fetch(`${base}/api/devops/config`, { method: "DELETE", headers, body: "{}" }); assert.equal(response.status, 200); assert.equal((await json(response)).configured, false);
 });
 
 test("UI API displays and operates DevOps projections with approval", async (t) => {
@@ -97,7 +124,7 @@ test("UI API displays and operates DevOps projections with approval", async (t) 
   response = await fetch(`${base}/api/devops/pipelines/trigger`, { method: "POST", headers, body: JSON.stringify({ pipelineId: "pay-ci", kind: "ci", actor: "owner", reason: "build", approved: false }) }); assert.equal(response.status, 400);
   response = await fetch(`${base}/api/devops/pipelines/trigger`, { method: "POST", headers, body: JSON.stringify({ pipelineId: "pay-ci", kind: "ci", changeId: "PAY-5", actor: "owner", reason: "build", approved: true }) }); assert.equal(response.status, 202); assert.equal((await json(response)).status, "running");
   response = await fetch(`${base}/api/devops/services/control`, { method: "POST", headers, body: JSON.stringify({ serviceId: "payment-api", action: "stop", actor: "operator", reason: "maintenance", approved: true }) }); assert.equal(response.status, 202); assert.equal((await json(response)).status, "stopped");
-  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.deepEqual(snapshot.integrations, { jiraConfigured: false, devopsConfigured: true });
+  const snapshot = await json(await fetch(`${base}/api/snapshot`)); assert.deepEqual(snapshot.integrations, { jiraConfigured: false, jiraConfig: { configured: false, source: "none", credentialConfigured: false }, devopsConfigured: true, devopsConfig: { configured: true, source: "runtime", credentialConfigured: false }, sourceControl: { configured: false, source: "none" }, gitLabConfig: { configured: false, active: false, source: "none", credentialConfigured: false }, gitHubConfig: { configured: false, active: false, source: "none", credentialConfigured: false } });
 });
 
 test("UI API runs a declarative Workflow", async (t) => {
@@ -109,6 +136,7 @@ test("UI API runs a declarative Workflow", async (t) => {
 });
 
 test("UI refuses non-loopback binding", () => {
-  const app = new CJHXFramework(".cjhx-test-ui");
-  assert.throws(() => createUiServer(app, { host: "0.0.0.0", port: 0, open: false }), /loopback/);
+  const root = mkdtempSync(resolve(tmpdir(), "cjhx-ui-bind-"));
+  try { const app = new CJHXFramework(resolve(root, ".cjhx")); assert.throws(() => createUiServer(app, { host: "0.0.0.0", port: 0, open: false }), /loopback/); }
+  finally { rmSync(root, { recursive: true, force: true }); }
 });

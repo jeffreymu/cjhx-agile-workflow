@@ -22,6 +22,9 @@ function objectArg(args: JsonObject, key: string): JsonObject { const value = ar
 export class ToolBroker {
   constructor(private readonly adapters: ToolAdapters = {}) {}
   hasAdapter(name: keyof ToolAdapters): boolean { return this.adapters[name] !== undefined; }
+  getAdapter<K extends keyof ToolAdapters>(name: K): ToolAdapters[K] { return this.adapters[name]; }
+  setAdapter<K extends keyof ToolAdapters>(name: K, adapter: NonNullable<ToolAdapters[K]>): void { this.adapters[name] = adapter; }
+  removeAdapter(name: keyof ToolAdapters): void { delete this.adapters[name]; }
   async execute(operation: ToolOperation, permissions: Set<string>): Promise<JsonObject> {
     if (!permissions.has(operation.tool)) throw new PolicyDenied(`skill has no permission for tool: ${operation.tool}`);
     const a = this.adapters; let result: JsonValue;

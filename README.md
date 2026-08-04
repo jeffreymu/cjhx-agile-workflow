@@ -23,7 +23,8 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - CLI、JSON 文件状态存储和执行审计记录；
 - 可视化 Web 控制台：变更导航、12 阶段时间线、证据门禁、Skills、Workflows 和运行记录；
 - 需求拆解任务看板：本地草稿、七阶段状态、验收/依赖/证据详情、筛选，以及受审批约束的 Jira 发布与同步投影；
-- DevOps 控制面：展示流水线和运行状态、制品版本、服务状态，并通过显式审批触发 CI/CD 或启停服务。
+- DevOps 控制面：展示流水线和运行状态、制品版本、服务状态，并通过显式审批触发 CI/CD 或启停服务；
+- 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider。
 
 ## 工具职责
 
@@ -85,7 +86,8 @@ npm run ui
 ├── skills/             # 已安装的不可变 Skill 包
 ├── skills-lock.json    # 版本与摘要锁定
 ├── runs/               # Skill 和 Workflow 执行记录
-└── tasks/              # 未发布任务草稿和 Jira 任务状态投影
+├── tasks/              # 未发布任务草稿和 Jira 任务状态投影
+└── integrations/       # 本地 Adapter 配置；凭据文件权限为 0600
 ```
 
 业务事实仍保存在其权威平台中；`.cjhx` 不复制 Jira、Confluence 或博云的完整业务数据。
