@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writ
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
-import { AgentService } from "../src/agents.js";
+import { AgentService, normalizeAgentResponse } from "../src/agents.js";
 import { PolicyDenied } from "../src/errors.js";
 import { Workspace } from "../src/storage.js";
 import type { Task } from "../src/tasks.js";
@@ -38,6 +38,12 @@ test("agent task execution requires approval and records output in the local wor
   const started = service.startTask("task-1", { approved: true, instructions: "Work test-first" }); const completed = await waitForRun(service, started.id);
   assert.equal(completed.status, "succeeded"); assert.equal(completed.taskId, "task-1"); assert.equal(completed.workspaceId, "workspace-1"); assert.equal(completed.agentId, "codex");
   assert.equal(statSync(resolve(service.storage.agentRuns, `${completed.id}.json`)).mode & 0o777, 0o600); const output = JSON.parse(completed.stdout.trim()) as { cwd: string; prompt: string }; assert.equal(realpathSync(output.cwd), realpathSync(repository)); assert.match(output.prompt, /Implement agent support/); assert.match(output.prompt, /Work test-first/);
+});
+
+test("Agent final responses are extracted conservatively and redacted", () => {
+  assert.equal(normalizeAgentResponse("progress only", "custom"), undefined);
+  assert.equal(normalizeAgentResponse("FINAL RESPONSE: token=abc /Users/name/repo", "custom"), "token=[REDACTED] [LOCAL_PATH]");
+  assert.equal(normalizeAgentResponse("native final output", "codex"), "native final output");
 });
 
 test("agent execution rejects virtual workspaces", async (t) => {

@@ -3,6 +3,8 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { CJHXError } from "./errors.js";
 import { CJHXFramework } from "./framework.js";
+import type { MemoryKind, MemoryScope, MemorySourceRef } from "./memory.js";
+import { memoryKinds } from "./memory.js";
 import type { JsonObject, LifecycleState, RiskLevel } from "./models.js";
 import { lifecycleStates, riskLevels } from "./models.js";
 import { Policy } from "./policy.js";
@@ -27,6 +29,15 @@ Commands:
   harness-validate FILE
   harness-effective TASK_ID
   harness-reports [--task-id TASK_ID]
+  session-start --task TASK_ID --actor ACTOR [--title TITLE]
+  session-list [--task TASK_ID] [--workspace-id ID]
+  session-show SESSION_ID
+  session-preview SESSION_ID --message TEXT [--agent-id ID] [--instructions TEXT]
+  session-continue SESSION_ID --message TEXT --context-digest DIGEST --approved [--agent-id ID] [--instructions TEXT]
+  memory-list [--task TASK_ID] [--change-id ID] [--workspace-id ID]
+  memory-remember --scope task|change|workspace --scope-id ID --kind KIND --content TEXT --actor ACTOR --source-type TYPE --source-id ID [--importance 3] [--pinned]
+  memory-correct MEMORY_ID --content TEXT --actor ACTOR --source-type TYPE --source-id ID [--reason TEXT]
+  memory-forget MEMORY_ID --actor ACTOR --reason TEXT
   ui [--host 127.0.0.1] [--port 4317] [--no-open]
 `;
 
@@ -64,6 +75,15 @@ async function execute(parsed: Parsed): Promise<unknown> {
     case "harness-validate": return { valid: true, bundle: app.harness.validate(loadPayload(position(parsed, 0, "Harness rule file"))) };
     case "harness-effective": return app.harness.effectiveForTask(position(parsed, 0, "task id"));
     case "harness-reports": return app.harness.listReports(option(parsed, "--task-id"));
+    case "session-start": return app.createAgentSession(option(parsed, "--task", true)!, { actor: option(parsed, "--actor", true)!, ...(option(parsed, "--title") ? { title: option(parsed, "--title") } : {}) });
+    case "session-list": return app.conversations.listSessions({ ...(option(parsed, "--task") ? { taskId: option(parsed, "--task") } : {}), ...(option(parsed, "--workspace-id") ? { workspaceId: option(parsed, "--workspace-id") } : {}) });
+    case "session-show": return app.conversations.getSession(position(parsed, 0, "session id"));
+    case "session-preview": return app.previewAgentTurn(position(parsed, 0, "session id"), { userMessage: option(parsed, "--message", true)!, ...(option(parsed, "--agent-id") ? { agentId: option(parsed, "--agent-id") } : {}), ...(option(parsed, "--instructions") ? { instructions: option(parsed, "--instructions") } : {}) });
+    case "session-continue": return app.startAgentTurn(position(parsed, 0, "session id"), { userMessage: option(parsed, "--message", true)!, approvedContextDigest: option(parsed, "--context-digest", true)!, approved: parsed.flags.has("--approved"), ...(option(parsed, "--agent-id") ? { agentId: option(parsed, "--agent-id") } : {}), ...(option(parsed, "--instructions") ? { instructions: option(parsed, "--instructions") } : {}) });
+    case "memory-list": return app.memory.list({ ...(option(parsed, "--task") ? { taskId: option(parsed, "--task") } : {}), ...(option(parsed, "--change-id") ? { changeId: option(parsed, "--change-id") } : {}), ...(option(parsed, "--workspace-id") ? { workspaceId: option(parsed, "--workspace-id") } : {}) });
+    case "memory-remember": { const scopeKind = option(parsed, "--scope", true)!; if (!["task", "change", "workspace"].includes(scopeKind)) throw new Error(`invalid memory scope: ${scopeKind}`); const kind = option(parsed, "--kind", true)!; if (!memoryKinds.includes(kind as MemoryKind)) throw new Error(`invalid memory kind: ${kind}`); const importance = Number(option(parsed, "--importance") ?? "3"); return app.memory.remember({ scope: { kind: scopeKind as MemoryScope["kind"], id: option(parsed, "--scope-id", true)! }, kind: kind as MemoryKind, content: option(parsed, "--content", true)!, actor: option(parsed, "--actor", true)!, importance: importance as 1 | 2 | 3 | 4 | 5, pinned: parsed.flags.has("--pinned"), sourceRefs: [{ type: option(parsed, "--source-type", true)! as MemorySourceRef["type"], id: option(parsed, "--source-id", true)! }] }); }
+    case "memory-correct": return app.memory.supersede(position(parsed, 0, "memory id"), { content: option(parsed, "--content", true)!, actor: option(parsed, "--actor", true)!, sourceRefs: [{ type: option(parsed, "--source-type", true)! as MemorySourceRef["type"], id: option(parsed, "--source-id", true)! }], ...(option(parsed, "--reason") ? { reason: option(parsed, "--reason") } : {}) });
+    case "memory-forget": return app.memory.forget(position(parsed, 0, "memory id"), { actor: option(parsed, "--actor", true)!, reason: option(parsed, "--reason", true)! });
     case "ui": { const rawPort = option(parsed, "--port") ?? "4317"; const port = Number(rawPort); if (!Number.isInteger(port)) throw new Error(`invalid UI port: ${rawPort}`); const ui = createUiServer(app, { host: option(parsed, "--host") ?? "127.0.0.1", port, open: !parsed.flags.has("--no-open") }); return await ui.listen(); }
     default: throw new Error(usage);
   }

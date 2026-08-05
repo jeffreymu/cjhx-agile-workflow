@@ -74,11 +74,12 @@ export class TaskService {
   get(id: string): Task { return this.workspace.getTask(id); }
 
   create(input: { changeId: string; workspaceId?: string; title: string; description?: string; owner?: string; priority?: TaskPriority; riskLevel?: RiskLevel; status?: TaskStatus; acceptanceCriteria?: string[]; dependencies?: string[]; evidenceRefs?: string[]; sourceRunId?: string; sourceTaskId?: string }): Task {
-    this.workspace.getChange(input.changeId);
+    const change = this.workspace.getChange(input.changeId);
+    if (input.workspaceId && change.workspaceId && input.workspaceId !== change.workspaceId) throw new ValidationError("task Workspace must match its Change Workspace");
     if (input.priority && !taskPriorities.includes(input.priority)) throw new ValidationError(`invalid task priority: ${input.priority}`);
     if (input.riskLevel && !riskLevels.includes(input.riskLevel)) throw new ValidationError(`invalid task risk level: ${input.riskLevel}`);
     if (input.status && !taskStatuses.includes(input.status)) throw new ValidationError(`invalid task status: ${input.status}`);
-    const now = utcNow(); const task: Task = { id: `task-${randomUUID().replaceAll("-", "")}`, changeId: input.changeId, ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}), title: required(input.title, "task title"), description: input.description?.trim() ?? "", owner: input.owner?.trim() || "unassigned", priority: input.priority ?? "P2", riskLevel: input.riskLevel ?? "L1", status: input.status ?? "todo", authority: "local-draft", acceptanceCriteria: input.acceptanceCriteria ?? [], dependencies: input.dependencies ?? [], evidenceRefs: input.evidenceRefs ?? [], ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}), ...(input.sourceTaskId ? { sourceTaskId: input.sourceTaskId } : {}), history: [], createdAt: now, updatedAt: now };
+    const workspaceId = input.workspaceId ?? change.workspaceId; const now = utcNow(); const task: Task = { id: `task-${randomUUID().replaceAll("-", "")}`, changeId: input.changeId, ...(workspaceId ? { workspaceId } : {}), title: required(input.title, "task title"), description: input.description?.trim() ?? "", owner: input.owner?.trim() || "unassigned", priority: input.priority ?? "P2", riskLevel: input.riskLevel ?? "L1", status: input.status ?? "todo", authority: "local-draft", acceptanceCriteria: input.acceptanceCriteria ?? [], dependencies: input.dependencies ?? [], evidenceRefs: input.evidenceRefs ?? [], ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}), ...(input.sourceTaskId ? { sourceTaskId: input.sourceTaskId } : {}), history: [], createdAt: now, updatedAt: now };
     this.workspace.saveTask(task); return task;
   }
 

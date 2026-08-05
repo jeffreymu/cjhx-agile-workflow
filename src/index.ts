@@ -1,5 +1,6 @@
 export * from "./adapters.js";
 export * from "./agents.js";
+export * from "./conversations.js";
 export * from "./devops-config.js";
 export * from "./devops.js";
 export * from "./errors.js";
@@ -11,6 +12,7 @@ export * from "./harness.js";
 export * from "./jira-config.js";
 export * from "./lifecycle.js";
 export * from "./local-skills.js";
+export * from "./memory.js";
 export * from "./models.js";
 export * from "./policy.js";
 export * from "./skills.js";

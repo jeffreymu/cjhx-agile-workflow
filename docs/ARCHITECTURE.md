@@ -11,7 +11,7 @@ CJHX Agile Workflow is a TypeScript-first, platform-neutral, skill-driven Agenti
 | Work items, status, owner, approval | Jira |
 | Requirements, use cases, design, ADR, strategy | Confluence |
 | Repositories, commits, change requests, code review | Configurable source-control platform |
-| Build, verification, quality gates, artifacts, deployment | BoCloud DevOps |
+| Build, verification, quality gates, artifacts, deployment | DevOps platform |
 | Skill versions and execution traces | CJHX workspace/registry |
 | Unpublished decomposed task drafts | CJHX workspace |
 | Published task status and assignment | Jira; CJHX stores a synchronized projection |
@@ -25,6 +25,8 @@ Experience: Jira / Confluence / IDE / CLI / CJHX Web UI
 Control plane: lifecycle + workflow + policy + context
                  |
 Skill plane: registry + lockfile + runtime + evidence
+                 |
+Conversation: Session + Turn + MemorySnapshot + execution-context approval
                  |
 Harness: rule snapshot + preflight + executor capability + postflight + Task gate
                  |
@@ -42,6 +44,8 @@ DevOps pipeline, run, artifact, and service data is read as a live projection th
 The Workspace Hub stores only repository references and display metadata under `.cjhx/workspaces/`. A local Workspace reads its canonical Git root and filesystem in real time. A virtual Workspace calls a configured GitLab or GitHub browser extension in real time and does not clone or persist repository trees, issues, change requests, or comments. Workspace-scoped views are projections: Overview summarizes repository health, Kanban invokes the same unified board projection as the global task-board entry with the current Workspace scope locked, Sessions projects Skill/Workflow runs, Team aggregates declared owners/assignees, and Codebase provides repository browsing.
 
 Harness Engineering is a governance module over task-scoped Agent execution. It compiles governed sources and the repository's `cjhx.harness.json` into a private immutable snapshot, binds human approval to its SHA-256 digest, evaluates preflight rules, verifies that the selected `AgentExecutor` can truthfully enforce requested controls, runs a fixed catalog of postflight checks, and emits a code-state-bound `ComplianceReport`. Agent process success, Harness compliance, and Task gate eligibility are separate facts. A repository change after postflight makes the report stale. The project file is Workspace-scoped; enterprise authority must come from an injected governed rule source.
+
+`ConversationService` owns task-bound Session and Turn lifecycles. `MemoryService` owns explicit durable records, scope filtering, lexical ranking, context budgets, correction, forgetting, and immutable MemorySnapshots. Session history, durable memory, and execution snapshots are separate facts. Historical context is always rendered as non-instructional data and cannot override Policy, Harness, authoritative task facts, or enabled Skills. A full execution-context digest covers Task content, Agent profile, Harness snapshot, recalled memory, current request, additional instructions, and the rendered Prompt; any change after preview invalidates approval.
 
 Configured development Agents form a task-execution plane beside (not inside) the platform Adapter plane. `AgentService` stores private CLI profiles under `.cjhx/agents/`, selects one default Agent, binds every execution to a concrete Task and local Workspace, builds the prompt from task context and acceptance criteria, and records private Agent Runs under `.cjhx/agent-runs/`. `LocalSkillService` discovers both CJHX `skill.json` packages and Agent `SKILL.md` instructions in bounded, non-symlink local roots. CJHX packages are enabled through the existing digest-locked registry; enabled Agent instructions are stored privately in `.cjhx/local-skills.json` and supplied as explicit instruction-file references in task prompts. Claude Code, Codex, Qoder, and custom CLI names are edge configuration; lifecycle and Task contracts remain Agent-product neutral. Executable tests and runs require explicit approval and never use a shell. The local process runner is an MVP seam, not a sandbox; production deployments must replace it with an isolated worktree/container/micro-VM executor.
 

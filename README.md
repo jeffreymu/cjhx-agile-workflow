@@ -1,6 +1,6 @@
 # CJHX Agile Workflow
 
-CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Agentic SDLC** 框架。它以 Jira、Confluence、可配置代码托管平台和博云 DevOps 为研发主干，通过 Agent、Skills、适配器、质量证据和人工门禁贯通：
+CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Agentic SDLC** 框架。它以 Jira、Confluence、可配置代码托管平台和 DevOps 平台为研发主干，通过 Agent、Skills、适配器、质量证据和人工门禁贯通：
 
 ```text
 意图表达 → 需求理解 → 用例与技术设计 → 代码实现 → 代码审查
@@ -17,7 +17,7 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - 内置 Skill 与受控外部进程 Skill；
 - Skill 风险等级、来源白名单、写操作审批和超时策略；
 - 声明式多 Skill Workflow 和跨步骤 `$ref` 数据传递；
-- Jira、Confluence、代码托管平台、博云 DevOps 和未来运行观测的适配器契约；
+- Jira、Confluence、代码托管平台、DevOps 平台和未来运行观测的适配器契约；
 - 权限检查后的 ToolBroker，Skill 不直接获得平台凭据；
 - 需求拆解、测试用例生成、代码评审、API 测试执行、Jira→Confluence 同步示例；
 - CLI、JSON 文件状态存储和执行审计记录；
@@ -27,6 +27,7 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider；
 - 开发智能体配置：在 UI 中配置 Claude Code、Codex、Qoder（兼容 qorder 称呼）或自定义非交互式 CLI，多配置共存并选择默认 Agent；经人工批准后可从任务详情启动本地 Workspace 开发，并记录任务级 Agent Run；
 - Harness Engineering：从版本化 `cjhx.harness.json` 编译不可变规则快照，将 Agent 审批绑定 SHA-256 摘要，执行受批准的 postflight checks，分别记录 Agent 状态与合规状态，并以代码状态锁定的 Compliance Report 约束 Task 门禁；
+- 会话与记忆：以 Task 为范围创建可恢复的多轮 Agent Session，允许在不同 Agent 间继续；每轮执行绑定不可变 MemorySnapshot 和完整 ExecutionContextSnapshot，长期记忆仅由用户显式记住、纠正、遗忘或固定；
 - Workspace Hub：以 Workspace 为范围提供 Overview、Kanban、Sessions、Team 和 Codebase 视图；Kanban 与全局任务看板复用同一投影和交互；支持导入/移除本地 Git 仓库，搜索文件，管理经审批的 worktree 与 Git refs，浏览并检查提交；
 - 虚拟 Workspace：无需克隆即可导入已配置的 GitLab/GitHub 仓库，实时浏览目录、文件、refs、提交、issue、PR/MR 和评论。
 
@@ -37,7 +38,7 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 | Jira | 工作项、状态、Owner、迭代、风险和审批 |
 | Confluence | 需求、用例、技术方案、ADR、测试策略和复盘 |
 | 代码托管平台 | 仓库、分支、提交、代码变更请求和代码评审 |
-| 博云 DevOps | 构建、扫描、测试、质量门禁、制品、部署和回滚 |
+| DevOps 平台 | 构建、扫描、测试、质量门禁、制品、部署和回滚 |
 | CJHX | 生命周期编排、Skill 运行、权限策略、证据索引和审计 |
 | 运行观测平台 | 暂不建设，通过 `ObservabilityAdapter` 预留 |
 
@@ -96,6 +97,7 @@ npm run ui
 ├── agents/             # Agent CLI 配置；文件权限为 0600
 ├── agent-runs/         # 任务级 Agent 运行与输出；文件权限为 0600
 ├── harness/            # 规则快照、合规报告与例外记录；文件权限为 0600
+├── memory/             # Session、Turn、长期记忆和执行上下文快照；文件权限为 0600
 └── integrations/       # 本地 Adapter 配置；凭据文件权限为 0600
 ```
 
@@ -163,9 +165,10 @@ npm run check           # 完整检查
 
 - [架构与边界](docs/ARCHITECTURE.md)
 - [Skill 开发与治理](docs/SKILLS.md)
-- [Jira、Confluence、代码托管、博云和观测适配](docs/INTEGRATIONS.md)
+- [Jira、Confluence、代码托管、DevOps 和观测适配](docs/INTEGRATIONS.md)
 - [可视化控制台](docs/UI.md)
 - [Harness Engineering 规则与门禁](docs/HARNESS_ENGINEERING.md)
+- [会话与记忆](docs/MEMORY.md)
 
 ## MVP 边界
 
@@ -173,7 +176,7 @@ npm run check           # 完整检查
 
 1. Jira 和 Confluence API/Webhook Adapter；
 2. 所选代码托管平台 Adapter；
-3. 博云 DevOps API/Webhook Adapter；
+3. DevOps API/Webhook Adapter；
 4. 数据库、事件队列、身份与密钥服务；
 5. 外部 Skill 的容器或微虚机沙箱；
 6. 企业 Skill Registry、签名、评测和灰度发布；

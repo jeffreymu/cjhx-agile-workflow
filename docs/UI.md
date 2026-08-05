@@ -61,7 +61,9 @@ The UI supports:
 23. browsing remote directory trees, files, refs, commits, issue, PR/MR, and comments as live Provider projections;
 24. configuring multiple Claude Code, Codex, Qoder, or custom non-interactive Agent CLI profiles, testing their executables with approval, and choosing a default Agent;
 25. previewing the effective Harness rule digest, preflight checks, executor capabilities, postflight checks, and Task gates before approving task-scoped Agent execution;
-26. launching approved task development in the task's local Workspace and inspecting Agent process status separately from Harness compliance, including immutable rule digest and per-check results.
+26. launching approved task development in the task's local Workspace and inspecting Agent process status separately from Harness compliance, including immutable rule digest and per-check results;
+27. creating Task-bound Agent Sessions, continuing multi-turn conversations across configured Agents, and inspecting each Turn's immutable MemorySnapshot;
+28. explicitly remembering, correcting, forgetting, pinning, and tracing Task/Change/Workspace memory without treating it as authoritative evidence.
 
 ## Security boundary
 
@@ -74,7 +76,8 @@ The built-in UI is a local SDK/MVP control surface, not an internet-facing enter
 - Local file browsing is confined to the canonical Git root, rejects symlinks that escape it, excludes `.git`, dependencies/build output from search, limits previews to 1 MB, and never exposes the active `.cjhx` state directory or Adapter credentials.
 - Worktree and Git-ref mutations require explicit human approval; commands use `execFile` argument arrays rather than a shell.
 - Agent executable tests and task development runs require explicit human approval. Agent commands use argument arrays with `shell: false`, run only from a task-associated local Workspace root, inherit only baseline process variables plus explicitly configured keys, have 1–120 minute timeouts, and cap stdout/stderr at 1 MB each.
-- Harness previews, reports, and effective Task rules require the UI token. Agent approval is bound to the current SHA-256 rule digest. Postflight checks use a fixed command catalog rather than rule-provided shell strings, and passed reports are bound to the repository state so later code changes require re-verification.
+- Harness previews, reports, and effective Task rules require the UI token. One-shot Agent approval is bound to the current SHA-256 rule digest. Session Turn approval is bound to a complete execution-context digest covering Task content, Agent profile, Harness rules, recalled memory, current input, additional instructions, enabled Skill context, and the fully rendered Prompt. Postflight checks use a fixed command catalog rather than rule-provided shell strings, and passed reports are bound to the repository state so later code changes require re-verification.
+- Session, Turn, memory, MemorySnapshot, and execution-context APIs require the UI token. Their private files use mode `0600`, and historical content is marked as non-instructional reference data before Prompt assembly.
 - The unauthenticated snapshot exposes only Agent profile/run metadata. Full commands, arguments, stdout, and stderr require the ephemeral UI session token. Agent config and run files use mode `0600`.
 - Local Skill scanning and enable/disable APIs require the UI token because scan results contain absolute local paths. Agent instruction enablement is stored in `.cjhx/local-skills.json` with mode `0600`; scanning does not follow symlink directories or modify discovered files.
 - A local Agent CLI shares the operating-system user's privileges and is not a sandbox. The prompt forbids push, publish, deploy, and destructive Git operations, but local enforcement cannot guarantee compliance. Enterprise use must execute Agents in isolated worktrees plus containers, gVisor/Kata, or micro-VMs with egress and credential policy.

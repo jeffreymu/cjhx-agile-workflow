@@ -1,8 +1,10 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ValidationError } from "./errors.js";
 import type { AgentRun } from "./agents.js";
+import type { AgentSession, AgentTurn, ExecutionContextSnapshot } from "./conversations.js";
+import type { MemoryRecord, MemorySnapshot } from "./memory.js";
 import type { Change, JsonValue, SkillRun } from "./models.js";
 import type { Task } from "./tasks.js";
 
@@ -24,6 +26,12 @@ export class Workspace {
   readonly harness: string;
   readonly ruleSnapshots: string;
   readonly complianceReports: string;
+  readonly memory: string;
+  readonly agentSessions: string;
+  readonly agentTurns: string;
+  readonly memoryRecords: string;
+  readonly memorySnapshots: string;
+  readonly executionContexts: string;
   readonly lockfile: string;
 
   constructor(root = ".cjhx") {
@@ -41,11 +49,18 @@ export class Workspace {
     this.harness = resolve(this.root, "harness");
     this.ruleSnapshots = resolve(this.harness, "snapshots");
     this.complianceReports = resolve(this.harness, "reports");
+    this.memory = resolve(this.root, "memory");
+    this.agentSessions = resolve(this.memory, "sessions");
+    this.agentTurns = resolve(this.memory, "turns");
+    this.memoryRecords = resolve(this.memory, "records");
+    this.memorySnapshots = resolve(this.memory, "snapshots");
+    this.executionContexts = resolve(this.memory, "execution-contexts");
     this.lockfile = resolve(this.root, "skills-lock.json");
   }
 
   initialize(): void {
     [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations, this.agents, this.agentRuns, this.harness, this.ruleSnapshots, this.complianceReports].forEach((path) => mkdirSync(path, { recursive: true }));
+    [this.memory, this.agentSessions, this.agentTurns, this.memoryRecords, this.memorySnapshots, this.executionContexts].forEach((path) => this.ensurePrivateDirectory(path));
     if (!existsSync(this.lockfile)) this.writeJson(this.lockfile, { schemaVersion: 1, skills: {} });
   }
 
@@ -96,10 +111,28 @@ export class Workspace {
   saveComplianceReport(value: { id: string }): void { this.initialize(); this.writePrivateJson(this.entityPath(this.complianceReports, value.id, "compliance report id"), value as unknown as JsonValue); }
   getComplianceReport<T>(id: string): T { return this.readJson(this.entityPath(this.complianceReports, id, "compliance report id")) as unknown as T; }
   listComplianceReports<T>(): T[] { this.initialize(); return this.jsonFiles(this.complianceReports).map((path) => this.readJson(path) as unknown as T); }
+  saveAgentSession(value: AgentSession): void { this.initialize(); this.writePrivateJson(this.entityPath(this.agentSessions, value.id, "agent session id"), value as unknown as JsonValue); }
+  getAgentSession(id: string): AgentSession { return this.readPrivateJson(this.entityPath(this.agentSessions, id, "agent session id")) as unknown as AgentSession; }
+  listAgentSessions(): AgentSession[] { this.initialize(); return this.jsonFiles(this.agentSessions).map((path) => this.readPrivateJson(path) as unknown as AgentSession).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
+  createAgentTurn(value: AgentTurn): void { this.initialize(); const directory = this.turnDirectory(value.sessionId); this.ensurePrivateDirectory(directory); const path = resolve(directory, `${String(value.sequence).padStart(6, "0")}.json`); const temporary = `${path}.${randomUUID()}.tmp`; try { writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }); linkSync(temporary, path); chmodSync(path, 0o600); } catch (error) { if (existsSync(path)) throw new ValidationError("conversation Turn sequence is already in use"); throw error; } finally { rmSync(temporary, { force: true }); } }
+  saveAgentTurn(value: AgentTurn): void { this.initialize(); const directory = this.turnDirectory(value.sessionId); this.ensurePrivateDirectory(directory); this.writePrivateJson(resolve(directory, `${String(value.sequence).padStart(6, "0")}.json`), value as unknown as JsonValue); }
+  removeAgentTurn(sessionId: string, sequence: number): void { rmSync(resolve(this.turnDirectory(sessionId), `${String(sequence).padStart(6, "0")}.json`), { force: true }); }
+  listAgentTurns(sessionId: string): AgentTurn[] { this.initialize(); const directory = this.turnDirectory(sessionId); if (!existsSync(directory)) return []; return this.jsonFiles(directory).map((path) => this.readPrivateJson(path) as unknown as AgentTurn).sort((a, b) => a.sequence - b.sequence); }
+  saveMemoryRecord(value: MemoryRecord): void { this.initialize(); this.writePrivateJson(this.entityPath(this.memoryRecords, value.id, "memory id"), value as unknown as JsonValue); }
+  removeMemoryRecord(id: string): void { rmSync(this.entityPath(this.memoryRecords, id, "memory id"), { force: true }); }
+  getMemoryRecord(id: string): MemoryRecord { return this.readPrivateJson(this.entityPath(this.memoryRecords, id, "memory id")) as unknown as MemoryRecord; }
+  listMemoryRecords(): MemoryRecord[] { this.initialize(); return this.jsonFiles(this.memoryRecords).map((path) => this.readPrivateJson(path) as unknown as MemoryRecord).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
+  saveMemorySnapshot(value: MemorySnapshot): void { this.initialize(); this.writePrivateJson(this.entityPath(this.memorySnapshots, value.id, "memory snapshot id"), value as unknown as JsonValue); }
+  getMemorySnapshot(id: string): MemorySnapshot { return this.readPrivateJson(this.entityPath(this.memorySnapshots, id, "memory snapshot id")) as unknown as MemorySnapshot; }
+  saveExecutionContext(value: ExecutionContextSnapshot): void { this.initialize(); this.writePrivateJson(this.entityPath(this.executionContexts, value.id, "execution context id"), value as unknown as JsonValue); }
+  getExecutionContext(id: string): ExecutionContextSnapshot { return this.readPrivateJson(this.entityPath(this.executionContexts, id, "execution context id")) as unknown as ExecutionContextSnapshot; }
 
   private changePath(id: string): string { return this.entityPath(this.changes, id, "change id"); }
   private integrationPath(id: string): string { return this.entityPath(this.integrations, id, "integration id"); }
   private entityPath(directory: string, id: string, label: string): string { if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id)) throw new ValidationError(`${label} contains unsupported characters`); return resolve(directory, `${id}.json`); }
+  private turnDirectory(sessionId: string): string { if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(sessionId)) throw new ValidationError("agent session id contains unsupported characters"); const directory = resolve(this.agentTurns, sessionId); if (existsSync(directory) && lstatSync(directory).isSymbolicLink()) throw new ValidationError("private state directory cannot be a symbolic link"); return directory; }
+  private ensurePrivateDirectory(path: string): void { if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new ValidationError("private state directory cannot be a symbolic link"); mkdirSync(path, { recursive: true, mode: 0o700 }); chmodSync(path, 0o700); }
+  private readPrivateJson(path: string): JsonValue { if (lstatSync(path).isSymbolicLink()) throw new ValidationError("private state file cannot be a symbolic link"); return this.readJson(path); }
   private jsonFiles(directory: string): string[] { return readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).map((entry) => resolve(directory, entry.name)); }
   private runTime(value: JsonValue): string { return typeof value === "object" && value !== null && !Array.isArray(value) && typeof value.completedAt === "string" ? value.completedAt : ""; }
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -21,6 +22,13 @@ test("imports requirement decomposition tasks idempotently", async (t) => {
   const first = app.importTasksFromRun(run.id, "PAY-1"); const second = app.importTasksFromRun(run.id, "PAY-1");
   assert.equal(first.length, 2); assert.equal(second.length, 2); assert.equal(app.listTasks().length, 2);
   assert.equal(first[0]?.sourceRunId, run.id); assert.deepEqual(first[0]?.acceptanceCriteria, ["已验证：支持批量取消"]);
+});
+
+test("task Workspace inherits from its Change and rejects cross-Workspace scope", (t) => {
+  const { app } = fixture(t); const repository = mkdtempSync(resolve(tmpdir(), "cjhx-task-workspace-")); t.after(() => rmSync(repository, { recursive: true, force: true })); const otherRepository = mkdtempSync(resolve(tmpdir(), "cjhx-task-workspace-other-")); t.after(() => rmSync(otherRepository, { recursive: true, force: true }));
+  for (const path of [repository, otherRepository]) execFileSync("git", ["init", "-b", "main", path]); const workspace = app.workspaceHub.addLocal({ path: repository }); const other = app.workspaceHub.addLocal({ path: otherRepository }); app.createChange("WS-1", "Scoped change", "owner", { workspaceId: workspace.id });
+  const inherited = app.createTask({ changeId: "WS-1", title: "Inherited scope" }); assert.equal(inherited.workspaceId, workspace.id);
+  assert.throws(() => app.createTask({ changeId: "WS-1", workspaceId: other.id, title: "Wrong scope" }), /must match/);
 });
 
 test("local draft task follows the board state machine", (t) => {

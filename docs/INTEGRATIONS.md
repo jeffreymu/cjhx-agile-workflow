@@ -53,9 +53,9 @@ The same saved providers supply virtual Workspace browsing extensions. GitLab ma
 
 Credentials are stored separately at `.cjhx/integrations/gitlab.json` and `.cjhx/integrations/github.json` with mode `0600`; UI responses expose only `credentialConfigured`. Production URLs require HTTPS, redirects are rejected, timeouts are bounded to 1–60 seconds, and responses are capped at 1 MB. Product names remain confined to these Adapter implementations and UI configuration; lifecycle and Skill contracts continue to use `SourceControlAdapter` and `scm.*` tools.
 
-## BoCloud DevOps
+## DevOps platform
 
-Implement `DevOpsAdapter` against the installed BoCloud product/version. Map validation, test result, immutable artifact, environment, deployment, and rollback capabilities. The exact API and webhook surface must be discovered from the deployed edition.
+Implement `DevOpsAdapter` against the installed enterprise product/version. Map validation, test result, immutable artifact, environment, deployment, and rollback capabilities. The exact API and webhook surface must be discovered from the deployed edition.
 
 The local control surface exposes a platform-neutral DevOps projection for:
 
@@ -64,7 +64,7 @@ The local control surface exposes a platform-neutral DevOps projection for:
 - immutable artifacts and versions;
 - deployed services, environments, versions, and running state.
 
-It can trigger CI/CD pipelines and start, stop, or restart services. Every write requires an explicit approval flag plus actor and reason; `DevOpsService` rejects unapproved writes before invoking `ToolBroker`. When no Adapter is configured, the UI shows the capability as unavailable and never simulates success. Read data is refreshed from BoCloud and is not persisted as a second source of truth.
+It can trigger CI/CD pipelines and start, stop, or restart services. Every write requires an explicit approval flag plus actor and reason; `DevOpsService` rejects unapproved writes before invoking `ToolBroker`. When no Adapter is configured, the UI shows the capability as unavailable and never simulates success. Read data is refreshed from the configured DevOps platform and is not persisted as a second source of truth.
 
 Production Adapter implementations must map `listPipelines`, `listPipelineRuns`, `listArtifacts`, `listServices`, `triggerPipeline`, and `controlService` to the installed DevOps edition. Restrict pipeline, environment, and service access by enterprise identity and policy in addition to the local confirmation gate.
 
