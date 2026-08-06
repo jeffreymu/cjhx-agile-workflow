@@ -3,9 +3,11 @@ import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ValidationError } from "./errors.js";
 import type { AgentRun } from "./agents.js";
+import type { AutomationClaim, AutomationDefinition, AutomationFinding, AutomationReport, AutomationRun, AutomationSignalSnapshot } from "./automations.js";
 import type { AgentSession, AgentTurn, ExecutionContextSnapshot } from "./conversations.js";
 import type { MemoryRecord, MemorySnapshot } from "./memory.js";
 import type { Change, JsonValue, SkillRun } from "./models.js";
+import type { Goal, GoalSnapshot } from "./goals.js";
 import type { Task } from "./tasks.js";
 
 export interface SkillLockRecord { version: string; digest: string; path: string; source: string }
@@ -32,6 +34,17 @@ export class Workspace {
   readonly memoryRecords: string;
   readonly memorySnapshots: string;
   readonly executionContexts: string;
+  readonly goals: string;
+  readonly goalRecords: string;
+  readonly goalSnapshots: string;
+  readonly automations: string;
+  readonly automationDefinitions: string;
+  readonly automationDefinitionSnapshots: string;
+  readonly automationClaims: string;
+  readonly automationSignalSnapshots: string;
+  readonly automationRuns: string;
+  readonly automationFindings: string;
+  readonly automationReports: string;
   readonly lockfile: string;
 
   constructor(root = ".cjhx") {
@@ -55,12 +68,23 @@ export class Workspace {
     this.memoryRecords = resolve(this.memory, "records");
     this.memorySnapshots = resolve(this.memory, "snapshots");
     this.executionContexts = resolve(this.memory, "execution-contexts");
+    this.goals = resolve(this.root, "goals");
+    this.goalRecords = resolve(this.goals, "records");
+    this.goalSnapshots = resolve(this.goals, "snapshots");
+    this.automations = resolve(this.root, "automations");
+    this.automationDefinitions = resolve(this.automations, "definitions");
+    this.automationDefinitionSnapshots = resolve(this.automations, "definition-snapshots");
+    this.automationClaims = resolve(this.automations, "claims");
+    this.automationSignalSnapshots = resolve(this.automations, "signal-snapshots");
+    this.automationRuns = resolve(this.automations, "runs");
+    this.automationFindings = resolve(this.automations, "findings");
+    this.automationReports = resolve(this.automations, "reports");
     this.lockfile = resolve(this.root, "skills-lock.json");
   }
 
   initialize(): void {
     [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations, this.agents, this.agentRuns, this.harness, this.ruleSnapshots, this.complianceReports].forEach((path) => mkdirSync(path, { recursive: true }));
-    [this.memory, this.agentSessions, this.agentTurns, this.memoryRecords, this.memorySnapshots, this.executionContexts].forEach((path) => this.ensurePrivateDirectory(path));
+    [this.memory, this.agentSessions, this.agentTurns, this.memoryRecords, this.memorySnapshots, this.executionContexts, this.goals, this.goalRecords, this.goalSnapshots, this.automations, this.automationDefinitions, this.automationDefinitionSnapshots, this.automationClaims, this.automationSignalSnapshots, this.automationRuns, this.automationFindings, this.automationReports].forEach((path) => this.ensurePrivateDirectory(path));
     if (!existsSync(this.lockfile)) this.writeJson(this.lockfile, { schemaVersion: 1, skills: {} });
   }
 
@@ -126,6 +150,32 @@ export class Workspace {
   getMemorySnapshot(id: string): MemorySnapshot { return this.readPrivateJson(this.entityPath(this.memorySnapshots, id, "memory snapshot id")) as unknown as MemorySnapshot; }
   saveExecutionContext(value: ExecutionContextSnapshot): void { this.initialize(); this.writePrivateJson(this.entityPath(this.executionContexts, value.id, "execution context id"), value as unknown as JsonValue); }
   getExecutionContext(id: string): ExecutionContextSnapshot { return this.readPrivateJson(this.entityPath(this.executionContexts, id, "execution context id")) as unknown as ExecutionContextSnapshot; }
+  saveGoal(value: Goal): void { this.initialize(); this.writePrivateJson(this.entityPath(this.goalRecords, value.id, "goal id"), value as unknown as JsonValue); }
+  getGoal<T = Goal>(id: string): T { return this.readPrivateJson(this.entityPath(this.goalRecords, id, "goal id")) as unknown as T; }
+  listGoals<T = Goal>(): T[] { this.initialize(); return this.jsonFiles(this.goalRecords).map((path) => this.readPrivateJson(path) as unknown as T); }
+  removeGoal(id: string): void { rmSync(this.entityPath(this.goalRecords, id, "goal id"), { force: true }); }
+  saveGoalSnapshot(value: GoalSnapshot): void { this.initialize(); this.writePrivateJson(this.entityPath(this.goalSnapshots, value.id, "goal snapshot id"), value as unknown as JsonValue); }
+  getGoalSnapshot<T = GoalSnapshot>(id: string): T { return this.readPrivateJson(this.entityPath(this.goalSnapshots, id, "goal snapshot id")) as unknown as T; }
+  listGoalSnapshots<T = GoalSnapshot>(): T[] { this.initialize(); return this.jsonFiles(this.goalSnapshots).map((path) => this.readPrivateJson(path) as unknown as T); }
+  saveAutomationDefinition(value: AutomationDefinition): void { this.initialize(); this.writePrivateJson(this.entityPath(this.automationDefinitions, value.id, "automation id"), value as unknown as JsonValue); }
+  getAutomationDefinition<T = AutomationDefinition>(id: string): T { return this.readPrivateJson(this.entityPath(this.automationDefinitions, id, "automation id")) as unknown as T; }
+  listAutomationDefinitions<T = AutomationDefinition>(): T[] { this.initialize(); return this.jsonFiles(this.automationDefinitions).map((path) => this.readPrivateJson(path) as unknown as T); }
+  removeAutomationDefinition(id: string): void { rmSync(this.entityPath(this.automationDefinitions, id, "automation id"), { force: true }); }
+  saveAutomationDefinitionSnapshot(value: { id: string }): void { this.initialize(); this.writePrivateJson(this.entityPath(this.automationDefinitionSnapshots, value.id, "automation definition snapshot id"), value as unknown as JsonValue); }
+  getAutomationDefinitionSnapshot<T>(id: string): T { return this.readPrivateJson(this.entityPath(this.automationDefinitionSnapshots, id, "automation definition snapshot id")) as unknown as T; }
+  createAutomationClaim(value: AutomationClaim): boolean { this.initialize(); const path = this.entityPath(this.automationClaims, value.automationId, "automation id"); const temporary = `${path}.${randomUUID()}.tmp`; try { writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }); linkSync(temporary, path); chmodSync(path, 0o600); return true; } catch (error) { if (existsSync(path)) return false; throw error; } finally { rmSync(temporary, { force: true }); } }
+  getAutomationClaim(id: string): AutomationClaim | undefined { const path = this.entityPath(this.automationClaims, id, "automation id"); return existsSync(path) ? this.readPrivateJson(path) as unknown as AutomationClaim : undefined; }
+  removeAutomationClaim(id: string, runId: string): void { const path = this.entityPath(this.automationClaims, id, "automation id"); if (!existsSync(path)) return; const claim = this.readPrivateJson(path) as unknown as AutomationClaim; if (claim.runId === runId) rmSync(path, { force: true }); }
+  saveAutomationSignalSnapshot(value: AutomationSignalSnapshot): void { this.initialize(); this.writePrivateJson(this.entityPath(this.automationSignalSnapshots, value.id, "automation signal snapshot id"), value as unknown as JsonValue); }
+  getAutomationSignalSnapshot<T = AutomationSignalSnapshot>(id: string): T { return this.readPrivateJson(this.entityPath(this.automationSignalSnapshots, id, "automation signal snapshot id")) as unknown as T; }
+  saveAutomationRun(value: AutomationRun): void { this.initialize(); this.writePrivateJson(this.entityPath(this.automationRuns, value.id, "automation run id"), value as unknown as JsonValue); }
+  getAutomationRun<T = AutomationRun>(id: string): T { return this.readPrivateJson(this.entityPath(this.automationRuns, id, "automation run id")) as unknown as T; }
+  listAutomationRuns<T = AutomationRun>(): T[] { this.initialize(); return this.jsonFiles(this.automationRuns).map((path) => this.readPrivateJson(path) as unknown as T); }
+  saveAutomationFinding(value: AutomationFinding): void { this.initialize(); this.writePrivateJson(this.entityPath(this.automationFindings, value.id, "automation finding id"), value as unknown as JsonValue); }
+  listAutomationFindings<T = AutomationFinding>(): T[] { this.initialize(); return this.jsonFiles(this.automationFindings).map((path) => this.readPrivateJson(path) as unknown as T); }
+  saveAutomationReport(value: AutomationReport): void { this.initialize(); this.writePrivateJson(this.entityPath(this.automationReports, value.id, "automation report id"), value as unknown as JsonValue); }
+  getAutomationReport<T = AutomationReport>(id: string): T { return this.readPrivateJson(this.entityPath(this.automationReports, id, "automation report id")) as unknown as T; }
+  listAutomationReports<T = AutomationReport>(): T[] { this.initialize(); return this.jsonFiles(this.automationReports).map((path) => this.readPrivateJson(path) as unknown as T); }
 
   private changePath(id: string): string { return this.entityPath(this.changes, id, "change id"); }
   private integrationPath(id: string): string { return this.entityPath(this.integrations, id, "integration id"); }

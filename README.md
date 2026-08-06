@@ -21,13 +21,15 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - 权限检查后的 ToolBroker，Skill 不直接获得平台凭据；
 - 需求拆解、测试用例生成、代码评审、API 测试执行、Jira→Confluence 同步示例；
 - CLI、JSON 文件状态存储和执行审计记录；
-- 可视化 Web 控制台：变更导航、12 阶段时间线、证据门禁、Skills、Workflows 和运行记录；
+- 可视化 Web 控制台：一级 Dashboard 聚合 Goal、待处理事项、运行状态与工程健康；一级“目标”提供 Goal 组合、结构化目标画布、成功标准、执行边界、Change/Task 映射、风险事实和不可变 Snapshot；
 - 统一任务看板：以同一七状态模型聚合 CJHX 本地草稿、Jira 任务投影以及 GitHub/GitLab issue 和 PR/MR；支持全局或 Workspace 范围、来源、类型、变更、Owner、风险和状态筛选；
 - DevOps 控制面：展示流水线和运行状态、制品版本、服务状态，并通过显式审批触发 CI/CD 或启停服务；
 - 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider；
 - 开发智能体配置：在 UI 中配置 Claude Code、Codex、Qoder（兼容 qorder 称呼）或自定义非交互式 CLI，多配置共存并选择默认 Agent；经人工批准后可从任务详情启动本地 Workspace 开发，并记录任务级 Agent Run；
 - Harness Engineering：从版本化 `cjhx.harness.json` 编译不可变规则快照，将 Agent 审批绑定 SHA-256 摘要，执行受批准的 postflight checks，分别记录 Agent 状态与合规状态，并以代码状态锁定的 Compliance Report 约束 Task 门禁；
 - 会话与记忆：以 Task 为范围创建可恢复的多轮 Agent Session，允许在不同 Agent 间继续；每轮执行绑定不可变 MemorySnapshot 和完整 ExecutionContextSnapshot，长期记忆仅由用户显式记住、纠正、遗忘或固定；
+- 自动化工程审计：一级菜单“自动化”提供内置 `daily-repository-review`，按日或工作日只读汇总依赖变化、测试/Harness 失败、风险变更、发布健康与明确/疑似卡住 Task；每次运行绑定 Definition Snapshot、Signal Snapshot、Git 状态和稳定 Finding 指纹，支持手工运行、启停、本地补跑与历史报告；
+- Agent Token 用量：AgentRun 记录 Provider/Driver 结构化计量、本地估算或 unavailable 状态，按 Run、Session、Task、Workspace、Automation 与 Automation Run 动态聚合，并在页面右上角实时展示当前/最近 Task 用量；
 - Workspace Hub：以 Workspace 为范围提供 Overview、Kanban、Sessions、Team 和 Codebase 视图；Kanban 与全局任务看板复用同一投影和交互；支持导入/移除本地 Git 仓库，搜索文件，管理经审批的 worktree 与 Git refs，浏览并检查提交；
 - 虚拟 Workspace：无需克隆即可导入已配置的 GitLab/GitHub 仓库，实时浏览目录、文件、refs、提交、issue、PR/MR 和评论。
 
@@ -98,6 +100,8 @@ npm run ui
 ├── agent-runs/         # 任务级 Agent 运行与输出；文件权限为 0600
 ├── harness/            # 规则快照、合规报告与例外记录；文件权限为 0600
 ├── memory/             # Session、Turn、长期记忆和执行上下文快照；文件权限为 0600
+├── goals/              # Goal 记录与不可变 GoalSnapshot；文件权限为 0600
+├── automations/        # Definition/Signal 快照、Run、Finding 与 Report；文件权限为 0600
 └── integrations/       # 本地 Adapter 配置；凭据文件权限为 0600
 ```
 
@@ -137,6 +141,42 @@ cjhx skill-run my.skill --input @payload.json
 ```
 
 CLI 的 `--input` 接受 JSON 字符串或文件路径。Web 控制台的 Skill Library 还会扫描 Pi、Claude、Codex、Qoder 的用户/项目 Skill 目录；可通过 `CJHX_SKILL_PATHS` 增加企业目录。`SKILL.md` 启用后作为任务 Agent 指引，`skill.json` 启用后进入 CJHX Registry；禁用均不删除原始目录。外部可执行 Skill 默认禁用；生产使用应在独立沙箱中执行，并经过来源、许可证、依赖、数据外发、权限和质量评测。
+
+## Goal 与 Dashboard
+
+Goal 是 Change 和 Task 上游的结构化结果契约：
+
+```text
+Goal → Change → Task → Run → Evidence
+```
+
+MVP Goal 固定绑定一个 Workspace，可关联同一 Workspace 下的多个 Change；Task 通过 Change 间接支持 Goal。Goal 保存目标声明、Owner、优先级、成功标准、范围内/范围外、约束、事实源引用、目标日期和复盘周期。创建、编辑、激活和状态转换都会生成私密、不可变的 `GoalSnapshot`；跨 Workspace Change 会被拒绝。Goal 健康状态由成功标准、阻塞 Task 和自动化 Finding 确定性投影为 `unknown`、`on-track`、`at-risk`、`off-track` 或 `achieved`，Agent 声明不能直接改变状态。
+
+```bash
+cjhx goal-create --input @goal.json
+cjhx goal-list
+cjhx goal-show GOAL_ID
+cjhx goal-update GOAL_ID --input @goal.json
+cjhx goal-status GOAL_ID active
+cjhx goal-snapshots GOAL_ID
+cjhx dashboard
+```
+
+Dashboard 是只读聚合入口，展示活跃/风险 Goal、阻塞 Task、待处理事项、Agent/Automation 运行、最新工程审计和最近活动；高风险操作仍需进入对应详情页并执行既有审批。
+
+## 自动化工程审计
+
+```bash
+cjhx automation-create --name "每日工程审计" --workspace-id WORKSPACE_ID --weekdays --time 09:00 --timezone Asia/Shanghai
+cjhx automation-list
+cjhx automation-run AUTOMATION_ID
+cjhx automation-runs --automation-id AUTOMATION_ID
+cjhx automation-findings --automation-id AUTOMATION_ID
+cjhx automation-report REPORT_ID
+cjhx agent-usage --kind task --id TASK_ID
+```
+
+第一版自动化只允许选择批准的五类内置检查，不接受任意 Shell、JavaScript 或自由 Workflow。基础报告由确定性分析生成；数据源不完整时标记 `partial`，发布样本不足时预测为 `unknown`，不会由 Agent 猜测日期。内置调度器只适用于 loopback 本地 MVP，企业环境应使用 CLI 加外部调度平台。
 
 ## Harness Engineering
 

@@ -24,7 +24,9 @@ The workspace stores configuration at `.cjhx/integrations/jira.json` with mode `
 
 ## Confluence
 
-Implement `ConfluenceAdapter` for page reads and draft writes. Requirements, use cases, designs, ADRs, and release documents remain authoritative in Confluence. Publishing approved pages should be a separate high-risk operation.
+Implement `ConfluenceAdapter` for page reads and draft writes. Requirements, use cases, Goal Briefs, designs, ADRs, and release documents remain authoritative in Confluence. Publishing approved pages should be a separate high-risk operation.
+
+CJHX Goal records may store a `confluence` source reference, but the reference does not copy or supersede the page. Goal success criteria should point to the authoritative Jira, Confluence, DevOps, or source-control fact used for verification. Updating a Goal creates a new CJHX `GoalSnapshot`; it never writes back to an external platform automatically.
 
 ## Source control
 
@@ -74,10 +76,10 @@ The local UI can configure a standard HTTP Gateway without restarting CJHX. The 
 
 ```text
 GET  /health
-GET  /pipelines?changeId=...
-GET  /pipeline-runs?changeId=...
-GET  /artifacts?changeId=...
-GET  /services?changeId=...
+GET  /pipelines?changeId=...&workspaceId=...
+GET  /pipeline-runs?changeId=...&workspaceId=...
+GET  /artifacts?changeId=...&workspaceId=...
+GET  /services?changeId=...&workspaceId=...
 POST /pipelines/{pipelineId}/runs
 POST /services/{serviceId}/actions
 POST /validations
@@ -87,7 +89,7 @@ POST /deployments
 GET  /deployments/{deploymentId}
 ```
 
-List endpoints return JSON arrays; all other endpoints return JSON objects. The optional project and tenant values are sent as `X-CJHX-Project-ID` and `X-CJHX-Tenant-ID`. Authentication can use a Bearer token, a configurable API-key header, or no authentication for an already protected internal Gateway.
+List endpoints return JSON arrays; all other endpoints return JSON objects. `workspaceId` is optional for interactive projections but should be honored when supplied by repository automation so signals from different Workspaces are not mixed. The optional project and tenant values are sent as `X-CJHX-Project-ID` and `X-CJHX-Tenant-ID`. Authentication can use a Bearer token, a configurable API-key header, or no authentication for an already protected internal Gateway.
 
 The workspace stores this configuration at `.cjhx/integrations/devops.json` with mode `0600`. Credentials are never returned by UI APIs; summaries expose only `credentialConfigured`. Production URLs require HTTPS, redirects are rejected, request timeouts are bounded to 1–60 seconds, and responses are capped at 1 MB. Use an enterprise secret manager instead of file-backed credentials for shared deployments.
 

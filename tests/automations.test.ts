@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+import test from "node:test";
+import { InMemoryDevOpsAdapter, ToolBroker } from "../src/adapters.js";
+import { CJHXFramework } from "../src/framework.js";
+
+function fixture(t: test.TestContext, withDevOps = false) {
+  const root = mkdtempSync(resolve(tmpdir(), "cjhx-automation-")); t.after(() => rmSync(root, { recursive: true, force: true })); const repo = resolve(root, "repo"); mkdirSync(repo); writeFileSync(resolve(repo, "package.json"), JSON.stringify({ name: "demo", dependencies: { alpha: "1.0.0" } }, null, 2)); writeFileSync(resolve(repo, "package-lock.json"), JSON.stringify({ lockfileVersion: 3 }, null, 2)); execFileSync("git", ["init", "-b", "main", repo]); execFileSync("git", ["-C", repo, "add", "."]); execFileSync("git", ["-C", repo, "-c", "user.name=CJHX", "-c", "user.email=cjhx@example.com", "commit", "-m", "initial"]);
+  const devops = new InMemoryDevOpsAdapter(); if (withDevOps) { devops.pipelineRuns.set("test-1", { id: "test-1", kind: "ci", status: "failed", completedAt: new Date().toISOString() }); devops.pipelineRuns.set("deploy-1", { id: "deploy-1", kind: "cd", status: "succeeded", completedAt: new Date().toISOString() }); }
+  const app = new CJHXFramework(resolve(root, ".cjhx"), { ...(withDevOps ? { tools: new ToolBroker({ devops }) } : {}) }); app.initialize(); const workspace = app.workspaceHub.addLocal({ path: repo, name: "Demo" }); if (withDevOps) for (const run of devops.pipelineRuns.values()) run.workspaceId = workspace.id; app.createChange("AUTO-1", "Automation", "owner", { workspaceId: workspace.id }); const upstream = app.createTask({ changeId: "AUTO-1", workspaceId: workspace.id, title: "Blocked upstream", owner: "owner", status: "blocked", acceptanceCriteria: ["done"] }); const downstream = app.createTask({ changeId: "AUTO-1", workspaceId: workspace.id, title: "Downstream", owner: "owner", status: "review", acceptanceCriteria: ["done"], dependencies: [upstream.id] }); return { root, repo, app, workspace, upstream, downstream };
+}
+
+test("daily repository review persists a private partial report with dependency, risk, release, and blocked task findings", async (t) => {
+  const { app, workspace, upstream } = fixture(t); const definition = app.automations.create({ name: "Daily health", workspaceId: workspace.id, enabled: false }); const run = await app.automations.run(definition.id); assert.equal(run.status, "partial"); const report = app.automations.getReport(run.reportId!); assert.equal(report.collectionStatus, "partial"); assert.equal(report.headCommitSha?.length, 40); assert.equal(report.releaseSummary.prediction.status, "unknown"); assert.ok(report.blockedTaskSummary.some((item) => item.taskId === upstream.id && item.classification === "explicitly-blocked")); assert.ok(report.findings.some((item) => item.category === "dependency")); assert.ok(report.findings.some((item) => item.category === "blocked-task")); assert.equal(report.signalSnapshotDigest, app.workspace.getAutomationSignalSnapshot(report.signalSnapshotId).digest); assert.equal(statSync(resolve(app.workspace.automationReports, `${report.id}.json`)).mode & 0o777, 0o600); assert.equal(statSync(app.workspace.automations).mode & 0o777, 0o700);
+});
+
+test("review detects dependency changes and carries finding lifecycle across runs", async (t) => {
+  const { repo, app, workspace } = fixture(t, true); const definition = app.automations.create({ name: "Daily health", workspaceId: workspace.id, enabled: false, thresholds: { repeatedTestFailureCount: 1 } }); const first = await app.automations.run(definition.id); assert.equal(first.status, "succeeded"); writeFileSync(resolve(repo, "package.json"), JSON.stringify({ name: "demo", dependencies: { alpha: "2.0.0", beta: "1.0.0" } }, null, 2)); writeFileSync(resolve(repo, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { beta: "1.0.0" } }, null, 2)); execFileSync("git", ["-C", repo, "add", "."]); execFileSync("git", ["-C", repo, "-c", "user.name=CJHX", "-c", "user.email=cjhx@example.com", "commit", "-m", "dependencies"]); const second = await app.automations.run(definition.id); const report = app.automations.getReport(second.reportId!); assert.deepEqual(report.dependencySummary.added, ["beta"]); assert.deepEqual(report.dependencySummary.changed, ["alpha"]); assert.equal(report.dependencySummary.lockfileChanged, true); assert.ok(report.testSummary.failedRuns >= 1); assert.ok(report.findings.some((item) => item.category === "test")); const third = await app.automations.run(definition.id); const thirdReport = app.automations.getReport(third.reportId!); assert.ok(thirdReport.findings.some((item) => item.lifecycle === "ongoing"));
+});
+
+test("repository state and definition changes make immutable reports stale", async (t) => {
+  const { repo, app, workspace } = fixture(t, true); const definition = app.automations.create({ name: "Daily", workspaceId: workspace.id, enabled: false }); const run = await app.automations.run(definition.id); assert.equal(app.automations.reportView(run.reportId!).stale, false); writeFileSync(resolve(repo, "uncommitted.txt"), "changed\n"); assert.equal(app.automations.reportView(run.reportId!).stale, true); rmSync(resolve(repo, "uncommitted.txt")); app.automations.update(definition.id, { name: "Daily changed" }); assert.equal(app.automations.reportView(run.reportId!).stale, true);
+});
+
+test("atomic automation claims prevent duplicate concurrent runs", async (t) => {
+  const { app, workspace } = fixture(t); const definition = app.automations.create({ name: "Daily", workspaceId: workspace.id, enabled: false }); const [first, second] = await Promise.all([app.automations.run(definition.id), app.automations.run(definition.id)]); assert.equal(first.id, second.id); assert.equal(app.automations.listRuns(definition.id).length, 1);
+});
+
+test("automation definitions validate schedules and keep historical runs after deletion", async (t) => {
+  const { app, workspace } = fixture(t); assert.throws(() => app.automations.create({ name: "Bad", workspaceId: workspace.id, schedule: { time: "29:99" } }), /HH:mm/); const definition = app.automations.create({ name: "Daily", workspaceId: workspace.id, schedule: { days: "daily", time: "09:00", timezone: "Asia/Shanghai" } }); assert.match(definition.nextRunAt ?? "", /^\d{4}-/); const run = await app.automations.run(definition.id); app.automations.remove(definition.id); assert.equal(app.automations.list().length, 0); assert.equal(app.automations.getRun(run.id).id, run.id); assert.match(readFileSync(resolve(app.workspace.automationRuns, `${run.id}.json`), "utf8"), /automationId/);
+});

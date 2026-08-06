@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writ
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
-import { AgentService, normalizeAgentResponse } from "../src/agents.js";
+import { AgentService, normalizeAgentResponse, parseAgentUsage } from "../src/agents.js";
 import { PolicyDenied } from "../src/errors.js";
 import { Workspace } from "../src/storage.js";
 import type { Task } from "../src/tasks.js";
@@ -44,6 +44,18 @@ test("Agent final responses are extracted conservatively and redacted", () => {
   assert.equal(normalizeAgentResponse("progress only", "custom"), undefined);
   assert.equal(normalizeAgentResponse("FINAL RESPONSE: token=abc /Users/name/repo", "custom"), "token=[REDACTED] [LOCAL_PATH]");
   assert.equal(normalizeAgentResponse("native final output", "codex"), "native final output");
+});
+
+test("Agent usage accepts strict structured events and rejects unsafe values", () => {
+  const usage = parseAgentUsage('CJHX_USAGE:{"source":"provider-reported","inputTokens":120,"outputTokens":30,"cacheReadTokens":10}', "codex"); assert.equal(usage?.source, "provider-reported"); assert.equal(usage?.inputTokens, 120); assert.equal(usage?.outputTokens, 30); assert.equal(usage?.cacheReadTokens, 10); assert.equal(usage?.totalTokens, 150); assert.match(usage?.observedAt ?? "", /^\d{4}-/);
+  assert.equal(parseAgentUsage('CJHX_USAGE:{"source":"provider-reported","inputTokens":1,"outputTokens":1}')?.source, "driver-reported");
+  assert.throws(() => parseAgentUsage('CJHX_USAGE:{"source":"driver-reported","inputTokens":-1}'), /usage field/);
+  assert.throws(() => parseAgentUsage('CJHX_USAGE:{"source":"driver-reported","inputTokens":1,"secret":"x"}'), /unknown fields/);
+  assert.throws(() => parseAgentUsage('CJHX_USAGE:{"source":"driver-reported","inputTokens":1,"outputTokens":1,"totalTokens":3}'), /must equal/);
+});
+
+test("Agent runs estimate tokens when a provider does not report usage and aggregate by Task", async (t) => {
+  const { script, service } = fixture(t); await service.save({ id: "codex", name: "Codex", kind: "codex", command: process.execPath, arguments: [script, "{prompt}"], versionArguments: [script, "--version"], promptTransport: "argument", timeoutMinutes: 5, environmentKeys: [] }, { approved: true }); const completed = await waitForRun(service, service.startTask("task-1", { approved: true }).id); assert.equal(completed.usage?.source, "estimated"); assert.ok((completed.usage?.inputTokens ?? 0) > 0); const summary = service.usageSummary({ kind: "task", id: "task-1" }); assert.equal(summary.runs, 1); assert.ok(summary.estimatedTokens > 0); assert.equal(summary.measuredTokens, 0);
 });
 
 test("agent execution rejects virtual workspaces", async (t) => {

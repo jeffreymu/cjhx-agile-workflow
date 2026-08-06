@@ -26,8 +26,8 @@ export class DevOpsService {
 
   configured(): boolean { return this.tools.hasAdapter("devops"); }
 
-  async overview(changeId?: string): Promise<DevOpsOverview> {
-    const request: JsonObject = { ...(changeId ? { changeId } : {}) };
+  async overview(changeId?: string, workspaceId?: string): Promise<DevOpsOverview> {
+    const request: JsonObject = { ...(changeId ? { changeId } : {}), ...(workspaceId ? { workspaceId } : {}) };
     const permissions = new Set(["devops.pipeline.list", "devops.pipeline-runs.list", "devops.artifact.list", "devops.service.list"]);
     const [pipelines, runs, artifacts, services] = await Promise.all([
       this.tools.execute({ tool: "devops.pipeline.list", arguments: { request } }, permissions),

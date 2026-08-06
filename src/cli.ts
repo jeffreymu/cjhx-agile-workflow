@@ -38,6 +38,21 @@ Commands:
   memory-remember --scope task|change|workspace --scope-id ID --kind KIND --content TEXT --actor ACTOR --source-type TYPE --source-id ID [--importance 3] [--pinned]
   memory-correct MEMORY_ID --content TEXT --actor ACTOR --source-type TYPE --source-id ID [--reason TEXT]
   memory-forget MEMORY_ID --actor ACTOR --reason TEXT
+  dashboard
+  goal-create --input JSON_OR_FILE
+  goal-list
+  goal-show GOAL_ID
+  goal-update GOAL_ID --input JSON_OR_FILE
+  goal-status GOAL_ID STATUS
+  goal-snapshots GOAL_ID
+  automation-create --name NAME --workspace-id ID [--branch main] [--daily|--weekdays] [--time 09:00] [--timezone Asia/Shanghai] [--disabled]
+  automation-list
+  automation-show AUTOMATION_ID
+  automation-run AUTOMATION_ID
+  automation-runs [--automation-id ID]
+  automation-findings [--automation-id ID]
+  automation-report REPORT_ID
+  agent-usage [--kind all|run|session|task|workspace|automation|automation-run] [--id ID]
   ui [--host 127.0.0.1] [--port 4317] [--no-open]
 `;
 
@@ -84,6 +99,21 @@ async function execute(parsed: Parsed): Promise<unknown> {
     case "memory-remember": { const scopeKind = option(parsed, "--scope", true)!; if (!["task", "change", "workspace"].includes(scopeKind)) throw new Error(`invalid memory scope: ${scopeKind}`); const kind = option(parsed, "--kind", true)!; if (!memoryKinds.includes(kind as MemoryKind)) throw new Error(`invalid memory kind: ${kind}`); const importance = Number(option(parsed, "--importance") ?? "3"); return app.memory.remember({ scope: { kind: scopeKind as MemoryScope["kind"], id: option(parsed, "--scope-id", true)! }, kind: kind as MemoryKind, content: option(parsed, "--content", true)!, actor: option(parsed, "--actor", true)!, importance: importance as 1 | 2 | 3 | 4 | 5, pinned: parsed.flags.has("--pinned"), sourceRefs: [{ type: option(parsed, "--source-type", true)! as MemorySourceRef["type"], id: option(parsed, "--source-id", true)! }] }); }
     case "memory-correct": return app.memory.supersede(position(parsed, 0, "memory id"), { content: option(parsed, "--content", true)!, actor: option(parsed, "--actor", true)!, sourceRefs: [{ type: option(parsed, "--source-type", true)! as MemorySourceRef["type"], id: option(parsed, "--source-id", true)! }], ...(option(parsed, "--reason") ? { reason: option(parsed, "--reason") } : {}) });
     case "memory-forget": return app.memory.forget(position(parsed, 0, "memory id"), { actor: option(parsed, "--actor", true)!, reason: option(parsed, "--reason", true)! });
+    case "dashboard": return app.dashboard.view();
+    case "goal-create": return app.goals.create(loadPayload(option(parsed, "--input", true)!) as unknown as Parameters<typeof app.goals.create>[0]);
+    case "goal-list": return app.goals.portfolio();
+    case "goal-show": return app.goals.assess(position(parsed, 0, "goal id"));
+    case "goal-update": return app.goals.update(position(parsed, 0, "goal id"), loadPayload(option(parsed, "--input", true)!) as unknown as Parameters<typeof app.goals.update>[1]);
+    case "goal-status": return app.goals.setStatus(position(parsed, 0, "goal id"), position(parsed, 1, "status") as Parameters<typeof app.goals.setStatus>[1]);
+    case "goal-snapshots": return app.goals.snapshots(position(parsed, 0, "goal id"));
+    case "automation-create": return app.automations.create({ name: option(parsed, "--name", true)!, workspaceId: option(parsed, "--workspace-id", true)!, ...(option(parsed, "--branch") ? { branch: option(parsed, "--branch") } : {}), schedule: { days: parsed.flags.has("--daily") ? "daily" : "weekdays", ...(option(parsed, "--time") ? { time: option(parsed, "--time") } : {}), ...(option(parsed, "--timezone") ? { timezone: option(parsed, "--timezone") } : {}) }, enabled: !parsed.flags.has("--disabled") });
+    case "automation-list": return app.automations.list();
+    case "automation-show": return app.automations.get(position(parsed, 0, "automation id"));
+    case "automation-run": return await app.automations.run(position(parsed, 0, "automation id"));
+    case "automation-runs": return app.automations.listRuns(option(parsed, "--automation-id"));
+    case "automation-findings": return app.automations.listFindings(option(parsed, "--automation-id"));
+    case "automation-report": return app.automations.getReport(position(parsed, 0, "report id"));
+    case "agent-usage": { const kind = option(parsed, "--kind") ?? "all"; if (!["all", "run", "session", "task", "workspace", "automation", "automation-run"].includes(kind)) throw new Error(`invalid usage kind: ${kind}`); const id = option(parsed, "--id"); if (kind !== "all" && !id) throw new Error("--id is required for scoped usage"); return app.agents.usageSummary({ kind: kind as "all" | "run" | "session" | "task" | "workspace" | "automation" | "automation-run", ...(id ? { id } : {}) }); }
     case "ui": { const rawPort = option(parsed, "--port") ?? "4317"; const port = Number(rawPort); if (!Number.isInteger(port)) throw new Error(`invalid UI port: ${rawPort}`); const ui = createUiServer(app, { host: option(parsed, "--host") ?? "127.0.0.1", port, open: !parsed.flags.has("--no-open") }); return await ui.listen(); }
     default: throw new Error(usage);
   }

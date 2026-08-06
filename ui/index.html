@@ -13,9 +13,12 @@
     <aside class="sidebar">
       <header class="brand"><span class="brand-mark">C</span><span><strong>CJHX</strong><small>Agile Workflow</small></span></header>
       <nav class="primary-nav" aria-label="主导航">
-        <button class="nav-item active" data-view="workspaces"><span class="nav-icon">▣</span><span>工作空间</span><span class="nav-count" id="workspace-count">0</span></button>
+        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">▦</span><span>Dashboard</span><span class="nav-count">●</span></button>
+        <button class="nav-item" data-view="goals"><span class="nav-icon">◎</span><span>目标</span><span class="nav-count" id="goal-count">0</span></button>
+        <button class="nav-item" data-view="workspaces"><span class="nav-icon">▣</span><span>工作空间</span><span class="nav-count" id="workspace-count">0</span></button>
         <button class="nav-item" data-view="changes"><span class="nav-icon">⌘</span><span>研发流程</span><span class="nav-count" id="change-count">0</span></button>
         <button class="nav-item" data-view="devops"><span class="nav-icon">▷</span><span>DevOps</span><span class="nav-count" id="devops-count">—</span></button>
+        <button class="nav-item" data-view="automations"><span class="nav-icon">⟳</span><span>自动化</span><span class="nav-count" id="automation-count">0</span></button>
         <button class="nav-item" data-view="integrations"><span class="nav-icon">⌁</span><span>集成配置</span><span class="nav-count" id="integration-count">0</span></button>
         <button class="nav-item" data-view="agents"><span class="nav-icon">◎</span><span>智能体</span><span class="nav-count" id="agent-count">0</span></button>
         <button class="nav-item" data-view="skills"><span class="nav-icon">◇</span><span>Skills</span><span class="nav-count" id="skill-count">0</span></button>
@@ -30,8 +33,8 @@
     </aside>
     <main class="main">
       <header class="topbar">
-        <div class="breadcrumbs"><span class="muted">工作区</span><span>/</span><strong id="page-title">研发变更</strong></div>
-        <div class="topbar-actions"><span id="sync-state" class="sync-state"><i></i> 已连接</span><button class="button secondary" id="install-skill">安装 Skill</button><button class="button primary" id="primary-action">创建变更</button></div>
+        <div class="breadcrumbs"><span class="muted">CJHX</span><span>/</span><strong id="page-title">Dashboard</strong></div>
+        <div class="topbar-actions"><span id="sync-state" class="sync-state"><i></i> 已连接</span><button class="token-meter" id="token-meter" type="button" title="查看 Token 使用情况"><i></i><span id="token-meter-state">无运行</span><strong id="token-meter-total">Token —</strong></button><button class="button secondary" id="install-skill">安装 Skill</button><button class="button primary" id="primary-action">设置目标</button></div>
       </header>
       <div id="content" class="content scrollbar" aria-live="polite"></div>
     </main>
