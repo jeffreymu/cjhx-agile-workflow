@@ -28,7 +28,7 @@ npm run ui
 The layout follows the quiet, content-first principles used by agent orchestration tools such as Orca:
 
 - compact left navigation led by Dashboard and first-class 目标, followed by Workspaces, delivery flow, Automation, integrations, Agents, Skills, and runs; the `<<` control collapses it to a persistent icon rail that retains the CJHX logo, compact CJHX label, and bottom theme control, and `>>` restores the full menu;
-- persistent work-item switching and search;
+- persistent work-item switching and search; `⌘K` / `Ctrl+K` expands a collapsed desktop sidebar before focusing search, while low-height sidebars keep navigation and work-item lists independently scrollable;
 - a central lifecycle canvas that makes the current stage and full delivery path visible;
 - contextual evidence, gate, transition, and Agentic Action panels;
 - neutral chrome, with color reserved for selection, success, warning, and failure state;
