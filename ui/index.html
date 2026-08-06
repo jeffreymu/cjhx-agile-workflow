@@ -10,19 +10,19 @@
 </head>
 <body>
   <div id="app" class="app-shell">
-    <aside class="sidebar">
-      <header class="brand"><span class="brand-mark">C</span><span><strong>CJHX</strong><small>Agile Workflow</small></span></header>
+    <aside id="sidebar" class="sidebar">
+      <header class="brand"><span class="brand-mark">C</span><span class="brand-copy"><strong>CJHX</strong><small>Agile Workflow</small></span><button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-controls="sidebar" aria-expanded="true" aria-label="收起左侧菜单" title="收起左侧菜单">&gt;&gt;</button></header>
       <nav class="primary-nav" aria-label="主导航">
-        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">▦</span><span>Dashboard</span><span class="nav-count">●</span></button>
-        <button class="nav-item" data-view="goals"><span class="nav-icon">◎</span><span>目标</span><span class="nav-count" id="goal-count">0</span></button>
-        <button class="nav-item" data-view="workspaces"><span class="nav-icon">▣</span><span>工作空间</span><span class="nav-count" id="workspace-count">0</span></button>
-        <button class="nav-item" data-view="changes"><span class="nav-icon">⌘</span><span>研发流程</span><span class="nav-count" id="change-count">0</span></button>
-        <button class="nav-item" data-view="devops"><span class="nav-icon">▷</span><span>DevOps</span><span class="nav-count" id="devops-count">—</span></button>
-        <button class="nav-item" data-view="automations"><span class="nav-icon">⟳</span><span>自动化</span><span class="nav-count" id="automation-count">0</span></button>
-        <button class="nav-item" data-view="integrations"><span class="nav-icon">⌁</span><span>集成配置</span><span class="nav-count" id="integration-count">0</span></button>
-        <button class="nav-item" data-view="agents"><span class="nav-icon">◎</span><span>智能体</span><span class="nav-count" id="agent-count">0</span></button>
-        <button class="nav-item" data-view="skills"><span class="nav-icon">◇</span><span>Skills</span><span class="nav-count" id="skill-count">0</span></button>
-        <button class="nav-item" data-view="runs"><span class="nav-icon">↯</span><span>运行记录</span><span class="nav-count" id="run-count">0</span></button>
+        <button class="nav-item active" data-view="dashboard" aria-label="Dashboard" title="Dashboard"><span class="nav-icon">▦</span><span>Dashboard</span><span class="nav-count">●</span></button>
+        <button class="nav-item" data-view="goals" aria-label="目标" title="目标"><span class="nav-icon">◎</span><span>目标</span><span class="nav-count" id="goal-count">0</span></button>
+        <button class="nav-item" data-view="workspaces" aria-label="工作空间" title="工作空间"><span class="nav-icon">▣</span><span>工作空间</span><span class="nav-count" id="workspace-count">0</span></button>
+        <button class="nav-item" data-view="changes" aria-label="研发流程" title="研发流程"><span class="nav-icon">⌘</span><span>研发流程</span><span class="nav-count" id="change-count">0</span></button>
+        <button class="nav-item" data-view="devops" aria-label="DevOps" title="DevOps"><span class="nav-icon">▷</span><span>DevOps</span><span class="nav-count" id="devops-count">—</span></button>
+        <button class="nav-item" data-view="automations" aria-label="自动化" title="自动化"><span class="nav-icon">⟳</span><span>自动化</span><span class="nav-count" id="automation-count">0</span></button>
+        <button class="nav-item" data-view="integrations" aria-label="集成配置" title="集成配置"><span class="nav-icon">⌁</span><span>集成配置</span><span class="nav-count" id="integration-count">0</span></button>
+        <button class="nav-item" data-view="agents" aria-label="智能体" title="智能体"><span class="nav-icon">◎</span><span>智能体</span><span class="nav-count" id="agent-count">0</span></button>
+        <button class="nav-item" data-view="skills" aria-label="Skills" title="Skills"><span class="nav-icon">◇</span><span>Skills</span><span class="nav-count" id="skill-count">0</span></button>
+        <button class="nav-item" data-view="runs" aria-label="运行记录" title="运行记录"><span class="nav-icon">↯</span><span>运行记录</span><span class="nav-count" id="run-count">0</span></button>
       </nav>
       <section class="sidebar-section">
         <div class="section-heading"><span>工作项</span><button class="icon-button" id="new-change" title="创建变更" aria-label="创建变更">＋</button></div>
