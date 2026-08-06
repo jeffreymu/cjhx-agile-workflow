@@ -27,7 +27,7 @@ npm run ui
 
 The layout follows the quiet, content-first principles used by agent orchestration tools such as Orca:
 
-- compact left navigation led by Dashboard and first-class 目标, followed by Workspaces, delivery flow, Automation, integrations, Agents, Skills, and runs; the `>>` control collapses it to a persistent icon rail, and `<<` restores the full menu;
+- compact left navigation led by Dashboard and first-class 目标, followed by Workspaces, delivery flow, Automation, integrations, Agents, Skills, and runs; the `<<` control collapses it to a persistent icon rail, and `>>` restores the full menu;
 - persistent work-item switching and search;
 - a central lifecycle canvas that makes the current stage and full delivery path visible;
 - contextual evidence, gate, transition, and Agentic Action panels;
