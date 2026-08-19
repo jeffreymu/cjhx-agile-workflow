@@ -1,6 +1,7 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
+import { openAgentTerminal, buildAgentTerminalScript, type AgentTerminalLaunch, type AgentTerminalLauncher } from "./agent-terminal.js";
 import { PolicyDenied, ValidationError } from "./errors.js";
 import type { ComplianceReport, HarnessService, RuleSnapshot } from "./harness.js";
 import type { JsonValue } from "./models.js";
@@ -8,7 +9,7 @@ import { utcNow } from "./models.js";
 import type { Workspace } from "./storage.js";
 import type { Task } from "./tasks.js";
 
-export const agentKinds = ["claude-code", "codex", "qoder", "custom"] as const;
+export const agentKinds = ["pi", "claude-code", "codex", "qoder", "custom"] as const;
 export type AgentKind = typeof agentKinds[number];
 export type PromptTransport = "argument" | "stdin";
 
@@ -29,6 +30,7 @@ export interface AgentSummary { configured: boolean; defaultAgentId?: string; pr
 export type TokenUsageSource = "provider-reported" | "driver-reported" | "estimated" | "unavailable";
 export interface AgentTokenUsage { source: TokenUsageSource; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number; reasoningTokens?: number; totalTokens?: number; observedAt: string }
 export interface AgentUsageCollector { collect(value: string): AgentTokenUsage | undefined }
+export class PiUsageCollector implements AgentUsageCollector { collect(value: string): AgentTokenUsage | undefined { return parseAgentUsage(value, "pi"); } }
 export class ClaudeCodeUsageCollector implements AgentUsageCollector { collect(value: string): AgentTokenUsage | undefined { return parseAgentUsage(value, "claude-code"); } }
 export class CodexUsageCollector implements AgentUsageCollector { collect(value: string): AgentTokenUsage | undefined { return parseAgentUsage(value, "codex"); } }
 export class QoderUsageCollector implements AgentUsageCollector { collect(value: string): AgentTokenUsage | undefined { return parseAgentUsage(value, "qoder"); } }
@@ -76,7 +78,7 @@ export class LocalProcessExecutor implements AgentExecutor {
 }
 interface AgentConfig { schemaVersion: 1; defaultAgentId?: string; profiles: AgentProfile[] }
 interface AgentWorkspace { id: string; kind: "local" | "virtual"; rootPath?: string }
-interface AgentDependencies { task(id: string): Task; workspace(id: string): AgentWorkspace; enabledSkills?(): { name: string; description: string; path: string }[]; harness?: HarnessService; executor?: AgentExecutor }
+interface AgentDependencies { task(id: string): Task; workspace(id: string): AgentWorkspace; enabledSkills?(): { name: string; description: string; path: string }[]; harness?: HarnessService; executor?: AgentExecutor; terminalLauncher?: AgentTerminalLauncher }
 export interface AgentPreparedTask { task: Task; profile: AgentProfile; workspace: AgentWorkspace & { rootPath: string }; prompt: string; agentProfileDigest: string; ruleSnapshot?: RuleSnapshot }
 export interface AgentRunContext { sessionId: string; turnId: string; memorySnapshotId: string; memorySnapshotDigest: string; executionContextId: string; executionContextDigest: string; promptDigest: string }
 export interface StartAgentTaskOptions { agentId?: string; instructions?: string; userMessage?: string; historicalContext?: string; approved: boolean; approvedRuleDigest?: string; context?: AgentRunContext; automationId?: string; automationRunId?: string; onCompleted?: (run: AgentRun) => void }
@@ -92,7 +94,7 @@ function hash(value: unknown): string { return `sha256:${createHash("sha256").up
 function estimatedTokens(value: string): number { if (!value) return 0; const cjk = [...value].filter((char) => /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(char)).length; return Math.max(1, Math.ceil((value.length - cjk) / 4 + cjk)); }
 function usageNumber(value: unknown, key: string): number | undefined { if (value === undefined) return undefined; if (!Number.isSafeInteger(value) || Number(value) < 0 || Number(value) > 1_000_000_000) throw new ValidationError(`invalid Agent usage field: ${key}`); return Number(value); }
 export function parseAgentUsage(value: string, kind: AgentKind = "custom"): AgentTokenUsage | undefined { const lines = value.replaceAll(/\r\n/g, "\n").split("\n").filter((line) => line.startsWith("CJHX_USAGE:")); if (!lines.length) return undefined; const raw = lines.at(-1)!.slice("CJHX_USAGE:".length); if (Buffer.byteLength(raw) > 4_096) throw new ValidationError("Agent usage event exceeds 4 KB"); let parsed: unknown; try { parsed = JSON.parse(raw); } catch { throw new ValidationError("Agent usage event is not valid JSON"); } if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new ValidationError("Agent usage event must be an object"); const item = parsed as Record<string, unknown>; const allowed = new Set(["source", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "totalTokens"]); if (Object.keys(item).some((key) => !allowed.has(key))) throw new ValidationError("Agent usage event contains unknown fields"); if (item.source !== "provider-reported" && item.source !== "driver-reported") throw new ValidationError("Agent usage source must be provider-reported or driver-reported"); const source = item.source === "provider-reported" && kind !== "custom" ? "provider-reported" : "driver-reported"; const inputTokens = usageNumber(item.inputTokens, "inputTokens") ?? 0; const outputTokens = usageNumber(item.outputTokens, "outputTokens") ?? 0; const cacheReadTokens = usageNumber(item.cacheReadTokens, "cacheReadTokens"); const cacheWriteTokens = usageNumber(item.cacheWriteTokens, "cacheWriteTokens"); const reasoningTokens = usageNumber(item.reasoningTokens, "reasoningTokens"); const reportedTotal = usageNumber(item.totalTokens, "totalTokens"); const totalTokens = inputTokens + outputTokens; if (reportedTotal !== undefined && reportedTotal !== totalTokens) throw new ValidationError("Agent usage totalTokens must equal inputTokens + outputTokens"); return { source, inputTokens, outputTokens, ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}), ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}), ...(reasoningTokens !== undefined ? { reasoningTokens } : {}), totalTokens, observedAt: utcNow() }; }
-function usageCollector(kind: AgentKind): AgentUsageCollector { return kind === "claude-code" ? new ClaudeCodeUsageCollector() : kind === "codex" ? new CodexUsageCollector() : kind === "qoder" ? new QoderUsageCollector() : new CustomAgentUsageCollector(); }
+function usageCollector(kind: AgentKind): AgentUsageCollector { return kind === "pi" ? new PiUsageCollector() : kind === "claude-code" ? new ClaudeCodeUsageCollector() : kind === "codex" ? new CodexUsageCollector() : kind === "qoder" ? new QoderUsageCollector() : new CustomAgentUsageCollector(); }
 function monotonicUsage(previous: AgentTokenUsage | undefined, next: AgentTokenUsage): boolean { if (!previous || previous.source === "estimated" || previous.source === "unavailable") return true; return (next.inputTokens ?? 0) >= (previous.inputTokens ?? 0) && (next.outputTokens ?? 0) >= (previous.outputTokens ?? 0) && (next.cacheReadTokens ?? 0) >= (previous.cacheReadTokens ?? 0) && (next.cacheWriteTokens ?? 0) >= (previous.cacheWriteTokens ?? 0) && (next.reasoningTokens ?? 0) >= (previous.reasoningTokens ?? 0); }
 export function normalizeAgentResponse(stdout: string, kind: AgentKind = "custom"): string | undefined { const clean = stdout.replaceAll(/\u001b\[[0-9;]*m/g, "").replaceAll(/\r\n/g, "\n").trim(); const marker = clean.lastIndexOf("FINAL RESPONSE:"); if (marker < 0 && kind === "custom") return undefined; const selected = marker >= 0 ? clean.slice(marker + "FINAL RESPONSE:".length) : clean.slice(-8_192); const redacted = selected.replaceAll(/\b(token|secret|password|api[_-]?key)\s*[:=]\s*\S+/gi, "$1=[REDACTED]").replaceAll(/\b(?:authorization\s*:\s*)?bearer\s+\S+/gi, "Bearer [REDACTED]").replaceAll(/\b(?:gh[pousr]_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]+)\b/g, "[REDACTED]").replaceAll(/\/(?:Users|home)\/[^\s]+/g, "[LOCAL_PATH]").trim(); return redacted ? redacted.slice(0, 8_192) : undefined; }
 
@@ -107,6 +109,14 @@ export class AgentService {
   getRun(id: string): AgentRun { return this.storage.getAgentRun(id); }
   harnessPreview(taskId: string, agentId?: string): { snapshot: RuleSnapshot; preflight: ReturnType<HarnessService["preflight"]>; executor: { id: string; evaluations: ReturnType<HarnessService["executorCapabilityEvaluations"]> } } {
     const harness = this.dependencies.harness; if (!harness) throw new ValidationError("Harness engineering is not configured"); const config = this.config(); const selected = agentId ?? config.defaultAgentId; const profile = selected ? config.profiles.find((item) => item.id === selected) : undefined; if (selected && !profile) throw new ValidationError(`agent profile not found: ${selected}`); const executor = this.dependencies.executor ?? new LocalProcessExecutor(); const snapshot = harness.effectiveForTask(taskId); return { snapshot, preflight: harness.preflight(taskId, snapshot), executor: { id: executor.id, evaluations: harness.executorCapabilityEvaluations(snapshot, executor.capabilities()) } };
+  }
+
+  openTerminal(id: string, options: { approved: boolean; cwd?: string }): AgentTerminalLaunch {
+    if (!options.approved) throw new PolicyDenied("Agent terminal verification requires explicit human approval");
+    const profile = this.config().profiles.find((item) => item.id === id); if (!profile) throw new ValidationError(`agent profile not found: ${id}`);
+    if (options.cwd !== undefined && !existsSync(options.cwd)) throw new ValidationError(`terminal cwd does not exist: ${options.cwd}`);
+    const script = buildAgentTerminalScript(profile, { ...(options.cwd ? { cwd: options.cwd } : {}) });
+    return (this.dependencies.terminalLauncher ?? openAgentTerminal)(script);
   }
 
   async save(input: AgentProfileInput, options: { approved: boolean }): Promise<AgentProfile> {

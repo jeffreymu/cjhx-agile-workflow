@@ -145,6 +145,8 @@ export function createUiServer(app: CJHXFramework, options: UiOptions = {}): UiS
       if (method === "DELETE" && agentMatch?.[1]) { send(response, 200, app.agents.remove(decode(agentMatch[1]))); return; }
       agentMatch = path.match(/^\/api\/agents\/([^/]+)\/activate$/);
       if (method === "POST" && agentMatch?.[1]) { send(response, 200, app.agents.activate(decode(agentMatch[1]))); return; }
+      agentMatch = path.match(/^\/api\/agents\/([^/]+)\/terminal$/);
+      if (method === "POST" && agentMatch?.[1]) { send(response, 200, app.agents.openTerminal(decode(agentMatch[1]), { approved: input.approved === true, ...(optionalText(input.cwd) ? { cwd: optionalText(input.cwd) } : {}) })); return; }
       const agentRunMatch = path.match(/^\/api\/tasks\/([^/]+)\/agent-runs$/);
       if (method === "POST" && agentRunMatch?.[1]) { send(response, 202, app.startAgentForTask(decode(agentRunMatch[1]), { ...(optionalText(input.agentId) ? { agentId: optionalText(input.agentId) } : {}), ...(optionalText(input.instructions) ? { instructions: optionalText(input.instructions) } : {}), ...(optionalText(input.approvedRuleDigest) ? { approvedRuleDigest: optionalText(input.approvedRuleDigest) } : {}), approved: input.approved === true })); return; }
       if (method === "POST" && path === "/api/agent-sessions") { send(response, 201, app.createAgentSession(text(input.taskId, "taskId"), { ...(optionalText(input.title) ? { title: optionalText(input.title) } : {}), actor: text(input.actor, "actor") })); return; }

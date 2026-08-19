@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { AgentService, normalizeAgentResponse, parseAgentUsage } from "../src/agents.js";
+import { buildAgentTerminalScript } from "../src/agent-terminal.js";
 import { PolicyDenied } from "../src/errors.js";
 import { Workspace } from "../src/storage.js";
 import type { Task } from "../src/tasks.js";
@@ -56,6 +57,32 @@ test("Agent usage accepts strict structured events and rejects unsafe values", (
 
 test("Agent runs estimate tokens when a provider does not report usage and aggregate by Task", async (t) => {
   const { script, service } = fixture(t); await service.save({ id: "codex", name: "Codex", kind: "codex", command: process.execPath, arguments: [script, "{prompt}"], versionArguments: [script, "--version"], promptTransport: "argument", timeoutMinutes: 5, environmentKeys: [] }, { approved: true }); const completed = await waitForRun(service, service.startTask("task-1", { approved: true }).id); assert.equal(completed.usage?.source, "estimated"); assert.ok((completed.usage?.inputTokens ?? 0) > 0); const summary = service.usageSummary({ kind: "task", id: "task-1" }); assert.equal(summary.runs, 1); assert.ok(summary.estimatedTokens > 0); assert.equal(summary.measuredTokens, 0);
+});
+
+test("pi agent profiles are supported and become the default for development tasks", async (t) => {
+  const { repository, script, service } = fixture(t);
+  const profile = await service.save({ id: "pi", name: "Pi", kind: "pi", command: process.execPath, arguments: [script, "{prompt}"], versionArguments: [script, "--version"], promptTransport: "argument", timeoutMinutes: 5, environmentKeys: [] }, { approved: true });
+  assert.equal(profile.kind, "pi"); assert.equal(profile.default, true); assert.equal(service.summary().defaultAgentId, "pi");
+  const completed = await waitForRun(service, service.startTask("task-1", { approved: true }).id);
+  assert.equal(completed.status, "succeeded"); assert.equal(completed.agentKind, "pi"); assert.equal(JSON.parse(completed.stdout.trim()).cwd && realpathSync(JSON.parse(completed.stdout.trim()).cwd), realpathSync(repository));
+  const usage = parseAgentUsage('CJHX_USAGE:{"source":"provider-reported","inputTokens":42,"outputTokens":7}', "pi");
+  assert.equal(usage?.source, "provider-reported"); assert.equal(usage?.totalTokens, 49);
+});
+
+test("agent terminal verification requires approval and launches a quoted script", async (t) => {
+  const { root, script, state } = fixture(t); let captured: string | undefined;
+  const service = new AgentService(state, { task: () => { throw new Error("unused"); }, workspace: () => { throw new Error("unused"); }, terminalLauncher: (value) => { captured = value; return { scriptPath: "/tmp/verify.command", opener: "open", arguments: ["-a", "Terminal", "/tmp/verify.command"] }; } });
+  await service.save({ id: "pi", name: "Pi", kind: "pi", command: process.execPath, arguments: [script, "{prompt}"], versionArguments: [script, "--version"], promptTransport: "argument", timeoutMinutes: 5, environmentKeys: [] }, { approved: true });
+  assert.throws(() => service.openTerminal("pi", { approved: false }), PolicyDenied);
+  assert.throws(() => service.openTerminal("missing", { approved: true }), /agent profile not found/);
+  assert.throws(() => service.openTerminal("pi", { approved: true, cwd: "/definitely/missing" }), /cwd does not exist/);
+  const launch = service.openTerminal("pi", { approved: true, cwd: root });
+  assert.equal(launch.opener, "open"); assert.ok(captured);
+  assert.match(captured!, /版本测试/); assert.ok(captured!.includes(`cd '${root}'`)); assert.ok(captured!.includes(`exec '${process.execPath}'`)); assert.ok(captured!.includes(`'${script}' '--version'`));
+});
+
+test("agent terminal script rejects control characters", () => {
+  assert.throws(() => buildAgentTerminalScript({ name: "bad", command: "pi\nrm -rf /", arguments: [], versionArguments: ["--version"] }), /control characters/);
 });
 
 test("agent execution rejects virtual workspaces", async (t) => {

@@ -1,4 +1,5 @@
 export * from "./adapters.js";
+export * from "./agent-terminal.js";
 export * from "./agents.js";
 export * from "./automations.js";
 export * from "./conversations.js";
