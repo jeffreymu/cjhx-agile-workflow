@@ -203,6 +203,7 @@ npm run check           # 完整检查
 
 ## 文档
 
+- [Web 端项目设计与开发使用指南](使用指南.md)
 - [架构与边界](docs/ARCHITECTURE.md)
 - [Skill 开发与治理](docs/SKILLS.md)
 - [Jira、Confluence、代码托管、DevOps 和观测适配](docs/INTEGRATIONS.md)
