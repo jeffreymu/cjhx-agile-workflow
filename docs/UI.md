@@ -49,7 +49,7 @@ The UI supports:
 11. running declarative Workflows with `$ref` data flow;
 12. viewing Skill and Workflow execution records and errors;
 13. importing requirement-decomposition output as idempotent local task drafts;
-14. viewing CJHX drafts, Jira projections, GitHub/GitLab issues, and PR/MR on one seven-column board with Workspace, source, kind, Change, Owner, risk, and status filters;
+14. viewing CJHX drafts, Jira projections, GitHub/GitLab issues, and PR/MR on one seven-column board with Workspace, source, kind, Change, Owner, risk, and status filters; the status navigator exposes all seven states and their counts with one-click column navigation, while the Kanban layout keeps “Backlog” fixed on the left and “已完成” fixed on the right so only the five intermediate states scroll horizontally;
 15. inspecting acceptance criteria, dependencies, evidence references, source runs, and history;
 16. transitioning local tasks through a guarded task state machine;
 17. publishing approved drafts to Jira and synchronizing Jira-owned task projections when a Jira Adapter is configured;
