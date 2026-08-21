@@ -4,6 +4,7 @@ export * from "./agents.js";
 export * from "./automations.js";
 export * from "./collaboration.js";
 export * from "./collaboration-bridge.js";
+export * from "./collaboration-scheduler.js";
 export * from "./collaboration-service.js";
 export * from "./conversations.js";
 export * from "./dashboard.js";
