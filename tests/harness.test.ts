@@ -7,6 +7,7 @@ import test from "node:test";
 import { PolicyDenied } from "../src/errors.js";
 import { CJHXFramework } from "../src/framework.js";
 import type { HarnessRuleBundle, HarnessRuleSource } from "../src/harness.js";
+import { WorktreeLeaseService } from "../src/worktree-leases.js";
 
 function bundle(overrides: Partial<HarnessRuleBundle> = {}): HarnessRuleBundle {
   return {
@@ -76,6 +77,12 @@ test("Harness invalidates a passed Task gate when the repository changes after p
   const { app, repository, script, task } = fixture(t); await configureAgent(app, script); const snapshot = app.harness.effectiveForTask(task.id); const run = await waitForCompliance(app, app.startAgentForTask(task.id, { approved: true, approvedRuleDigest: snapshot.digest }).id); const report = app.harness.getReport(run.complianceReportId!);
   assert.match(report.repositoryStateDigest, /^sha256:/); writeFileSync(resolve(repository, "after-verification.ts"), "export const changed = true;\n");
   assert.throws(() => app.transitionTask(task.id, "verification", { actor: "developer", reason: "stale verification" }), /repository state|postflight/i);
+});
+
+test("Worktree Harness reports validate the isolated tree but never satisfy the main Task gate", async (t) => {
+  const rule = bundle({ rules: [{ id: "worktree-quality", description: "Validate isolated code", requiredChecks: ["npm.test"], gates: [{ target: "task.verification", requires: ["check:npm.test"] }] }] }); const { app, repository, workspace, task } = fixture(t, rule); writeFileSync(resolve(repository, "package.json"), JSON.stringify({ scripts: { test: "node -e \"const fs=require('fs');process.exit(fs.existsSync('worktree-only.txt')?0:7)\"" } })); execFileSync("git", ["-C", repository, "add", "."]); execFileSync("git", ["-C", repository, "-c", "user.name=CJHX", "-c", "user.email=cjhx@example.com", "commit", "-m", "harness fixture"]);
+  const leases = new WorktreeLeaseService(app.workspace, { workspace: () => app.workspaceHub.get(workspace.id) }); const lease = leases.provision({ collaborationId: "collaboration-1", assignmentId: "assignment-1", workspaceId: workspace.id, baseRevision: "HEAD", approved: true }); writeFileSync(resolve(lease.path, "worktree-only.txt"), "isolated\n"); const target = { kind: "worktree" as const, rootPath: lease.path, worktreeLeaseId: lease.id, baseCommit: lease.baseCommit }; const snapshot = app.harness.effectiveForTask(task.id, target); const report = await app.harness.verifyRun("agent-run-worktree", task.id, snapshot, "succeeded", target); assert.equal(report.status, "passed"); assert.equal(report.executionTargetKind, "worktree"); assert.equal(report.worktreeLeaseId, lease.id); assert.throws(() => app.transitionTask(task.id, "verification", { actor: "developer", reason: "worktree-only evidence" }), /Harness gate/i);
+  writeFileSync(resolve(repository, "worktree-only.txt"), "integrated\n"); const mainSnapshot = app.harness.effectiveForTask(task.id); const mainReport = await app.harness.verifyRun("agent-run-main", task.id, mainSnapshot, "succeeded"); assert.equal(mainReport.executionTargetKind, "workspace"); assert.equal(app.transitionTask(task.id, "verification", { actor: "developer", reason: "main Workspace verified" }).status, "verification");
 });
 
 test("Harness refuses enforce-mode capabilities that the local process executor cannot guarantee", async (t) => {
