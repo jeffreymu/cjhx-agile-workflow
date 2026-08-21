@@ -13,7 +13,7 @@ function fixture(t: test.TestContext) {
   const root = mkdtempSync(resolve(tmpdir(), "cjhx-agents-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const repository = resolve(root, "repo"); mkdirSync(repository); const state = new Workspace(resolve(root, ".cjhx")); state.initialize();
   const script = resolve(root, "fake-agent.mjs");
-  writeFileSync(script, `if (process.argv.includes("--version")) { console.log("fake-agent 1.2.3"); process.exit(0); }\nlet input=""; for await (const chunk of process.stdin) input += chunk; console.log(JSON.stringify({cwd:process.cwd(),argv:process.argv.slice(2),prompt:process.argv.at(-1),stdin:input}));\n`);
+  writeFileSync(script, `if (process.argv.includes("--version")) { console.log("fake-agent 1.2.3"); process.exit(0); }\nlet input=""; for await (const chunk of process.stdin) input += chunk; console.log(JSON.stringify({cwd:process.cwd(),argv:process.argv.slice(2),prompt:process.argv.at(-1),stdin:input,collaboration:process.env.CJHX_COLLABORATION_ID}));\n`);
   chmodSync(script, 0o700); const tasks: Task[] = [{ id: "task-1", changeId: "CHANGE-1", workspaceId: "workspace-1", title: "Implement agent support", description: "Add configuration and execution", owner: "dev", priority: "P1", riskLevel: "L2", status: "in_progress", authority: "local-draft", acceptanceCriteria: ["Agent run is recorded"], dependencies: [], evidenceRefs: [], history: [], createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }];
   const service = new AgentService(state, { task: (id) => { const task = tasks.find((item) => item.id === id); if (!task) throw new Error("missing task"); return task; }, workspace: () => ({ id: "workspace-1", kind: "local", rootPath: repository }) });
   return { root, repository, script, state, service };
@@ -39,6 +39,17 @@ test("agent task execution requires approval and records output in the local wor
   const started = service.startTask("task-1", { approved: true, instructions: "Work test-first" }); const completed = await waitForRun(service, started.id);
   assert.equal(completed.status, "succeeded"); assert.equal(completed.taskId, "task-1"); assert.equal(completed.workspaceId, "workspace-1"); assert.equal(completed.agentId, "codex");
   assert.equal(statSync(resolve(service.storage.agentRuns, `${completed.id}.json`)).mode & 0o777, 0o600); const output = JSON.parse(completed.stdout.trim()) as { cwd: string; prompt: string }; assert.equal(realpathSync(output.cwd), realpathSync(repository)); assert.match(output.prompt, /Implement agent support/); assert.match(output.prompt, /Work test-first/);
+});
+
+test("trusted execution grants run once inside an isolated worktree", async (t) => {
+  const { root, script, service } = fixture(t); const worktree = resolve(root, "worktree"); mkdirSync(worktree);
+  await service.save({ id: "pi", name: "Pi", kind: "pi", command: process.execPath, arguments: [script, "{prompt}"], versionArguments: [script, "--version"], promptTransport: "argument", timeoutMinutes: 5, environmentKeys: [] }, { approved: true });
+  assert.throws(() => service.issueExecutionGrant({ collaborationId: "../escape", assignmentId: "assignment-1", cwd: worktree }), /unsupported/);
+  assert.throws(() => service.issueExecutionGrant({ collaborationId: "collaboration-1", assignmentId: "assignment-1", cwd: worktree, environment: { PATH: "unsafe" } }), /environment/);
+  const executionGrantId = service.issueExecutionGrant({ collaborationId: "collaboration-1", assignmentId: "assignment-1", worktreeLeaseId: "worktree-lease-1", cwd: worktree, environment: { CJHX_COLLABORATION_ID: "collaboration-1" } });
+  const completed = await waitForRun(service, service.startTask("task-1", { approved: true, executionGrantId }).id); const output = JSON.parse(completed.stdout.trim()) as { cwd: string; collaboration: string };
+  assert.equal(realpathSync(output.cwd), realpathSync(worktree)); assert.equal(output.collaboration, "collaboration-1"); assert.equal(completed.collaborationId, "collaboration-1"); assert.equal(completed.assignmentId, "assignment-1"); assert.equal(completed.worktreeLeaseId, "worktree-lease-1"); assert.equal(completed.executionRoot, realpathSync(worktree));
+  assert.throws(() => service.startTask("task-1", { approved: true, executionGrantId }), /invalid or already consumed/);
 });
 
 test("Agent final responses are extracted conservatively and redacted", () => {
