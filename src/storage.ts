@@ -5,6 +5,7 @@ import { ValidationError } from "./errors.js";
 import type { AgentRun } from "./agents.js";
 import type { AutomationClaim, AutomationDefinition, AutomationFinding, AutomationReport, AutomationRun, AutomationSignalSnapshot } from "./automations.js";
 import type { AgentSession, AgentTurn, ExecutionContextSnapshot } from "./conversations.js";
+import type { AgentAssignment, AgentMessage, Collaboration, CollaborationCapability, CollaborationPlanSnapshot, WorktreeLease } from "./collaboration.js";
 import type { MemoryRecord, MemorySnapshot } from "./memory.js";
 import type { Change, JsonValue, SkillRun } from "./models.js";
 import type { Goal, GoalSnapshot } from "./goals.js";
@@ -34,6 +35,13 @@ export class Workspace {
   readonly memoryRecords: string;
   readonly memorySnapshots: string;
   readonly executionContexts: string;
+  readonly collaborations: string;
+  readonly collaborationRecords: string;
+  readonly collaborationPlanSnapshots: string;
+  readonly collaborationAssignments: string;
+  readonly collaborationMessages: string;
+  readonly collaborationCapabilities: string;
+  readonly collaborationWorktreeLeases: string;
   readonly goals: string;
   readonly goalRecords: string;
   readonly goalSnapshots: string;
@@ -68,6 +76,13 @@ export class Workspace {
     this.memoryRecords = resolve(this.memory, "records");
     this.memorySnapshots = resolve(this.memory, "snapshots");
     this.executionContexts = resolve(this.memory, "execution-contexts");
+    this.collaborations = resolve(this.root, "collaborations");
+    this.collaborationRecords = resolve(this.collaborations, "records");
+    this.collaborationPlanSnapshots = resolve(this.collaborations, "plan-snapshots");
+    this.collaborationAssignments = resolve(this.collaborations, "assignments");
+    this.collaborationMessages = resolve(this.collaborations, "messages");
+    this.collaborationCapabilities = resolve(this.collaborations, "capabilities");
+    this.collaborationWorktreeLeases = resolve(this.collaborations, "worktree-leases");
     this.goals = resolve(this.root, "goals");
     this.goalRecords = resolve(this.goals, "records");
     this.goalSnapshots = resolve(this.goals, "snapshots");
@@ -84,7 +99,7 @@ export class Workspace {
 
   initialize(): void {
     [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations, this.agents, this.agentRuns, this.harness, this.ruleSnapshots, this.complianceReports].forEach((path) => mkdirSync(path, { recursive: true }));
-    [this.memory, this.agentSessions, this.agentTurns, this.memoryRecords, this.memorySnapshots, this.executionContexts, this.goals, this.goalRecords, this.goalSnapshots, this.automations, this.automationDefinitions, this.automationDefinitionSnapshots, this.automationClaims, this.automationSignalSnapshots, this.automationRuns, this.automationFindings, this.automationReports].forEach((path) => this.ensurePrivateDirectory(path));
+    [this.memory, this.agentSessions, this.agentTurns, this.memoryRecords, this.memorySnapshots, this.executionContexts, this.collaborations, this.collaborationRecords, this.collaborationPlanSnapshots, this.collaborationAssignments, this.collaborationMessages, this.collaborationCapabilities, this.collaborationWorktreeLeases, this.goals, this.goalRecords, this.goalSnapshots, this.automations, this.automationDefinitions, this.automationDefinitionSnapshots, this.automationClaims, this.automationSignalSnapshots, this.automationRuns, this.automationFindings, this.automationReports].forEach((path) => this.ensurePrivateDirectory(path));
     if (!existsSync(this.lockfile)) this.writeJson(this.lockfile, { schemaVersion: 1, skills: {} });
   }
 
@@ -150,6 +165,24 @@ export class Workspace {
   getMemorySnapshot(id: string): MemorySnapshot { return this.readPrivateJson(this.entityPath(this.memorySnapshots, id, "memory snapshot id")) as unknown as MemorySnapshot; }
   saveExecutionContext(value: ExecutionContextSnapshot): void { this.initialize(); this.writePrivateJson(this.entityPath(this.executionContexts, value.id, "execution context id"), value as unknown as JsonValue); }
   getExecutionContext(id: string): ExecutionContextSnapshot { return this.readPrivateJson(this.entityPath(this.executionContexts, id, "execution context id")) as unknown as ExecutionContextSnapshot; }
+  saveCollaboration(value: Collaboration): void { this.initialize(); this.writePrivateJson(this.entityPath(this.collaborationRecords, value.id, "collaboration id"), value as unknown as JsonValue); }
+  getCollaboration(id: string): Collaboration { return this.readPrivateJson(this.entityPath(this.collaborationRecords, id, "collaboration id")) as unknown as Collaboration; }
+  listCollaborations(): Collaboration[] { this.initialize(); return this.jsonFiles(this.collaborationRecords).map((path) => this.readPrivateJson(path) as unknown as Collaboration).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
+  saveCollaborationPlanSnapshot(value: CollaborationPlanSnapshot): void { this.initialize(); this.writePrivateJson(this.entityPath(this.collaborationPlanSnapshots, value.id, "collaboration plan snapshot id"), value as unknown as JsonValue); }
+  getCollaborationPlanSnapshot(id: string): CollaborationPlanSnapshot { return this.readPrivateJson(this.entityPath(this.collaborationPlanSnapshots, id, "collaboration plan snapshot id")) as unknown as CollaborationPlanSnapshot; }
+  saveAgentAssignment(value: AgentAssignment): void { this.initialize(); this.writePrivateJson(this.entityPath(this.collaborationAssignments, value.id, "agent assignment id"), value as unknown as JsonValue); }
+  getAgentAssignment(id: string): AgentAssignment { return this.readPrivateJson(this.entityPath(this.collaborationAssignments, id, "agent assignment id")) as unknown as AgentAssignment; }
+  listAgentAssignments(): AgentAssignment[] { this.initialize(); return this.jsonFiles(this.collaborationAssignments).map((path) => this.readPrivateJson(path) as unknown as AgentAssignment).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); }
+  createAgentMessage(value: AgentMessage): void { this.initialize(); this.createPrivateEntity(this.collaborationMessages, value.id, "agent message id", value as unknown as JsonValue, "agent message already exists"); }
+  saveAgentMessage(value: AgentMessage): void { this.initialize(); this.writePrivateJson(this.entityPath(this.collaborationMessages, value.id, "agent message id"), value as unknown as JsonValue); }
+  getAgentMessage(id: string): AgentMessage { return this.readPrivateJson(this.entityPath(this.collaborationMessages, id, "agent message id")) as unknown as AgentMessage; }
+  listAgentMessages(): AgentMessage[] { this.initialize(); return this.jsonFiles(this.collaborationMessages).map((path) => this.readPrivateJson(path) as unknown as AgentMessage).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); }
+  saveCollaborationCapability(value: CollaborationCapability): void { this.initialize(); this.writePrivateJson(this.entityPath(this.collaborationCapabilities, value.id, "collaboration capability id"), value as unknown as JsonValue); }
+  getCollaborationCapability(id: string): CollaborationCapability { return this.readPrivateJson(this.entityPath(this.collaborationCapabilities, id, "collaboration capability id")) as unknown as CollaborationCapability; }
+  listCollaborationCapabilities(): CollaborationCapability[] { this.initialize(); return this.jsonFiles(this.collaborationCapabilities).map((path) => this.readPrivateJson(path) as unknown as CollaborationCapability); }
+  saveWorktreeLease(value: WorktreeLease): void { this.initialize(); this.writePrivateJson(this.entityPath(this.collaborationWorktreeLeases, value.id, "worktree lease id"), value as unknown as JsonValue); }
+  getWorktreeLease(id: string): WorktreeLease { return this.readPrivateJson(this.entityPath(this.collaborationWorktreeLeases, id, "worktree lease id")) as unknown as WorktreeLease; }
+  listWorktreeLeases(): WorktreeLease[] { this.initialize(); return this.jsonFiles(this.collaborationWorktreeLeases).map((path) => this.readPrivateJson(path) as unknown as WorktreeLease).sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
   saveGoal(value: Goal): void { this.initialize(); this.writePrivateJson(this.entityPath(this.goalRecords, value.id, "goal id"), value as unknown as JsonValue); }
   getGoal<T = Goal>(id: string): T { return this.readPrivateJson(this.entityPath(this.goalRecords, id, "goal id")) as unknown as T; }
   listGoals<T = Goal>(): T[] { this.initialize(); return this.jsonFiles(this.goalRecords).map((path) => this.readPrivateJson(path) as unknown as T); }
@@ -177,11 +210,12 @@ export class Workspace {
   getAutomationReport<T = AutomationReport>(id: string): T { return this.readPrivateJson(this.entityPath(this.automationReports, id, "automation report id")) as unknown as T; }
   listAutomationReports<T = AutomationReport>(): T[] { this.initialize(); return this.jsonFiles(this.automationReports).map((path) => this.readPrivateJson(path) as unknown as T); }
 
+  private createPrivateEntity(directory: string, id: string, label: string, value: JsonValue, duplicateMessage: string): void { const path = this.entityPath(directory, id, label); const temporary = `${path}.${randomUUID()}.tmp`; try { writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }); linkSync(temporary, path); chmodSync(path, 0o600); } catch (error) { if (existsSync(path)) throw new ValidationError(duplicateMessage); throw error; } finally { rmSync(temporary, { force: true }); } }
   private changePath(id: string): string { return this.entityPath(this.changes, id, "change id"); }
   private integrationPath(id: string): string { return this.entityPath(this.integrations, id, "integration id"); }
   private entityPath(directory: string, id: string, label: string): string { if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id)) throw new ValidationError(`${label} contains unsupported characters`); return resolve(directory, `${id}.json`); }
   private turnDirectory(sessionId: string): string { if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(sessionId)) throw new ValidationError("agent session id contains unsupported characters"); const directory = resolve(this.agentTurns, sessionId); if (existsSync(directory) && lstatSync(directory).isSymbolicLink()) throw new ValidationError("private state directory cannot be a symbolic link"); return directory; }
-  private ensurePrivateDirectory(path: string): void { if (existsSync(path) && lstatSync(path).isSymbolicLink()) throw new ValidationError("private state directory cannot be a symbolic link"); mkdirSync(path, { recursive: true, mode: 0o700 }); chmodSync(path, 0o700); }
+  private ensurePrivateDirectory(path: string): void { try { if (lstatSync(path).isSymbolicLink()) throw new ValidationError("private state directory cannot be a symbolic link"); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; } mkdirSync(path, { recursive: true, mode: 0o700 }); chmodSync(path, 0o700); }
   private readPrivateJson(path: string): JsonValue { if (lstatSync(path).isSymbolicLink()) throw new ValidationError("private state file cannot be a symbolic link"); return this.readJson(path); }
   private jsonFiles(directory: string): string[] { return readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).map((entry) => resolve(directory, entry.name)); }
   private runTime(value: JsonValue): string { return typeof value === "object" && value !== null && !Array.isArray(value) && typeof value.completedAt === "string" ? value.completedAt : ""; }

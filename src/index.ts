@@ -2,6 +2,7 @@ export * from "./adapters.js";
 export * from "./agent-terminal.js";
 export * from "./agents.js";
 export * from "./automations.js";
+export * from "./collaboration.js";
 export * from "./conversations.js";
 export * from "./dashboard.js";
 export * from "./devops-config.js";
