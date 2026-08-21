@@ -9,4 +9,4 @@ for (const args of [[], ["-p", "tsconfig.ui.json"]]) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 mkdirSync(resolve("dist/ui"), { recursive: true });
-for (const asset of ["index.html", "styles.css"]) copyFileSync(resolve("ui", asset), resolve("dist/ui", asset));
+for (const asset of ["index.html", "styles.css", "cjhx-ai.svg"]) copyFileSync(resolve("ui", asset), resolve("dist/ui", asset));

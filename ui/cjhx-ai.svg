@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">CJHX AI</title>
+  <rect width="512" height="512" rx="104" fill="#3b0000"/>
+  <path fill="#ff9800" d="M117 368 190 151h55l74 217h-46l-19-57h-75l-18 57h-44Zm74-96h51l-25-79-26 79Z"/>
+  <rect x="341" y="198" width="44" height="170" rx="3" fill="#ff9800"/>
+  <circle cx="363" cy="158" r="25" fill="#ff9800"/>
+</svg>

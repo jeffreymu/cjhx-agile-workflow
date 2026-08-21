@@ -22,7 +22,7 @@ export interface UiServer { readonly token: string; listen(): Promise<UiAddress>
 
 const loopbackHosts = new Set(["127.0.0.1", "::1", "localhost"]);
 const assets = resolve(dirname(fileURLToPath(import.meta.url)), "../ui");
-const assetTypes: Record<string, string> = { "/app.js": "text/javascript; charset=utf-8", "/styles.css": "text/css; charset=utf-8" };
+const assetTypes: Record<string, string> = { "/app.js": "text/javascript; charset=utf-8", "/styles.css": "text/css; charset=utf-8", "/cjhx-ai.svg": "image/svg+xml; charset=utf-8" };
 
 function text(value: unknown, key: string): string { if (typeof value !== "string" || !value.trim()) throw new ValidationError(`${key} is required`); return value.trim(); }
 function optionalText(value: unknown): string | undefined { return typeof value === "string" && value.trim() ? value.trim() : undefined; }
