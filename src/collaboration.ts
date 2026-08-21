@@ -41,7 +41,7 @@ export interface AgentMessage {
   status: "pending" | "delivered" | "consumed" | "rejected"; digest: string; createdAt: string; consumedAt?: string;
 }
 export interface CollaborationCapability {
-  schemaVersion: 1; id: string; tokenDigest: string; collaborationId: string; assignmentId: string; agentId: string;
+  schemaVersion: 1; id: string; tokenDigest: string; collaborationId: string; assignmentId: string; agentId: string; runId: string;
   permissions: ("message.send" | "message.read-own" | "assignment.delegate")[]; expiresAt: string; createdAt: string; revokedAt?: string;
 }
 export interface WorktreeLease {
