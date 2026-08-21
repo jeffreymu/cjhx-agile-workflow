@@ -36,6 +36,7 @@ CJHX Agile Workflow is a TypeScript-first, skill-driven Agentic SDLC control pla
 - `policy.ts` — risk levels (S0–S6), source allowlist, approval policy.
 - `harness.ts` — Harness Engineering: immutable rule snapshots from `cjhx.harness.json`, digest-bound approval, preflight, executor-capability honesty, postflight checks, Task gates.
 - `agents.ts` — `AgentService` + `AgentExecutor` seam (`LocalProcessExecutor` is MVP-only, not a sandbox); supported kinds: `pi` (default preset), `claude-code`, `codex`, `qoder`, `deepseek-harness`, `custom`.
+- `collaboration*.ts`, `worktree-leases.ts` — immutable human-approved Collaboration Plans, bounded Assignment delegation/scheduling, loopback Run-bound capability messaging, and isolated managed Git Worktrees; no automatic merge/push/deploy/cleanup.
 - `agent-terminal.ts` — approval-gated local terminal verification: builds a single-quote-escaped version-test + interactive-session script (mode `0700`, temp dir) and opens it with the platform terminal via argument arrays, never a shell.
 - `conversations.ts` / `memory.ts` — task-scoped Sessions/Turns, explicit durable memory, immutable `MemorySnapshot` / `ExecutionContextSnapshot`; history is non-instructional data.
 - `goals.ts` / `dashboard.ts` — `Goal → Change → Task` contracts with immutable `GoalSnapshot`; dashboard is read-only aggregation.
@@ -49,7 +50,8 @@ CJHX Agile Workflow is a TypeScript-first, skill-driven Agentic SDLC control pla
 
 - One state machine: UI and CLI operate the same `CJHXFramework` + `.cjhx` workspace; never create parallel stores or skip evidence gates.
 - Everything write-side is approval- and digest-bound: Skill enablement, Agent turns, Harness rules, Git mutations, DevOps actions.
-- Snapshots (Goal, Harness rule, Memory, ExecutionContext, Signal) are immutable and SHA-256 identified; post-check repo changes make reports stale.
+- Snapshots (Goal, Harness rule, Memory, ExecutionContext, Signal, Collaboration Plan) are immutable and SHA-256 identified; post-check repo changes make reports stale.
+- Collaboration messages and Agent outputs are untrusted data. Autonomous delegation remains inside the approved Plan; every Assignment gets a distinct managed Worktree, and Worktree reports cannot satisfy the main Workspace Task gate.
 - All subprocess/Git invocations use argument arrays with `shell: false`; cap output, timeout, and environment.
 - Durable memory, automation, and dashboards are read-only or explicit-user-action only; they can never satisfy lifecycle/Harness gates.
 - `.cjhx` stores control-plane facts only; platform business data is read live via adapters and never copied.

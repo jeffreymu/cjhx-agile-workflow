@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { AgentRun } from "./agents.js";
 
 export const collaborationRoles = ["coordinator", "implementer", "reviewer", "tester", "researcher", "integrator"] as const;
@@ -11,15 +12,18 @@ export interface CollaborationUsage { assignments: number; runningAssignments: n
 export interface Collaboration {
   schemaVersion: 1; id: string; workspaceId: string; changeId: string; taskId: string; title: string; objective: string;
   status: CollaborationStatus; planSnapshotId?: string; planDigest?: string; rootAssignmentId?: string;
-  limits: CollaborationLimits; usage: CollaborationUsage; createdBy: string; createdAt: string; updatedAt: string; completedAt?: string;
+  limits: CollaborationLimits; usage: CollaborationUsage; createdBy: string; createdAt: string; updatedAt: string; startedAt?: string; completedAt?: string;
 }
 export interface CollaborationPlanSnapshot {
   schemaVersion: 1; id: string; digest: string; collaborationId: string; workspaceId: string; changeId: string; taskId: string;
   allowedAgentIds: string[]; allowedRoles: CollaborationRole[]; limits: CollaborationLimits;
-  worktreePolicy: { writersRequireIsolatedWorktree: true; allowReadOnlySharedSnapshot: boolean; baseRevision: string; autoMerge: false; autoPush: false };
+  worktreePolicy: { writersRequireIsolatedWorktree: true; allowReadOnlySharedSnapshot: boolean; baseRevision: string; baseCommit: string; autoMerge: false; autoPush: false };
   delegationPolicy: { mode: "plan-bounded"; allowAgentDelegation: boolean; requireAcceptanceCriteria: true; requireKnownAgent: true };
   harnessRuleSnapshotDigest: string; createdAt: string;
 }
+export type CollaborationPlanBasis = Omit<CollaborationPlanSnapshot, "schemaVersion" | "id" | "digest" | "createdAt">;
+export function collaborationPlanBasis(plan: CollaborationPlanSnapshot | CollaborationPlanBasis): CollaborationPlanBasis { return { collaborationId: plan.collaborationId, workspaceId: plan.workspaceId, changeId: plan.changeId, taskId: plan.taskId, allowedAgentIds: plan.allowedAgentIds, allowedRoles: plan.allowedRoles, limits: plan.limits, worktreePolicy: plan.worktreePolicy, delegationPolicy: plan.delegationPolicy, harnessRuleSnapshotDigest: plan.harnessRuleSnapshotDigest }; }
+export function collaborationPlanDigest(plan: CollaborationPlanSnapshot | CollaborationPlanBasis): string { return `sha256:${createHash("sha256").update(JSON.stringify(collaborationPlanBasis(plan))).digest("hex")}`; }
 export interface AssignmentOutput {
   summary: string; findings: string[]; artifactRefs: string[];
   git?: { baseCommit: string; headCommit?: string; branch: string; changedFiles: string[]; diffStat: string; clean: boolean };

@@ -26,6 +26,7 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - DevOps 控制面：展示流水线和运行状态、制品版本、服务状态，并通过显式审批触发 CI/CD 或启停服务；
 - 集成配置中心：在 UI 中测试、保存、更新或移除 Jira、DevOps、GitLab 与 GitHub Adapter，凭据不回显；GitLab/GitHub 可分别保存并选择当前代码托管 Provider；
 - 开发智能体配置：在 UI 中配置 Pi（默认预设）、Claude Code、Codex、Qoder（兼容 qorder 称呼）、DeepSeek Harness 或自定义非交互式 CLI，多配置共存并选择默认 Agent；经人工批准后可从任务详情启动本地 Workspace 开发，并记录任务级 Agent Run；
+- 受治理的多 Agent 协作：Task 范围内通过不可变人工批准 Plan 约束 Agent/角色、Assignment、委派深度、并行度、消息、时间和 Token 预算；Agent 使用短期 Run-bound loopback capability 交换结构化消息或委派，所有 Assignment 在独立受管 Git Worktree 中运行，不自动 merge、push、部署或推进生命周期；
 - Harness Engineering：从版本化 `cjhx.harness.json` 编译不可变规则快照，将 Agent 审批绑定 SHA-256 摘要，执行受批准的 postflight checks，分别记录 Agent 状态与合规状态，并以代码状态锁定的 Compliance Report 约束 Task 门禁；
 - 会话与记忆：以 Task 为范围创建可恢复的多轮 Agent Session，允许在不同 Agent 间继续；每轮执行绑定不可变 MemorySnapshot 和完整 ExecutionContextSnapshot，长期记忆仅由用户显式记住、纠正、遗忘或固定；
 - 自动化工程审计：一级菜单“自动化”提供内置 `daily-repository-review`，按日或工作日只读汇总依赖变化、测试/Harness 失败、风险变更、发布健康与明确/疑似卡住 Task；每次运行绑定 Definition Snapshot、Signal Snapshot、Git 状态和稳定 Finding 指纹，支持手工运行、启停、本地补跑与历史报告；
@@ -98,6 +99,7 @@ npm run ui
 ├── workspaces/         # 本地仓库引用和虚拟仓库元数据；不复制远端事实
 ├── agents/             # Agent CLI 配置；文件权限为 0600
 ├── agent-runs/         # 任务级 Agent 运行与输出；文件权限为 0600
+├── collaborations/     # Plan、Assignment、消息、Capability 与 Worktree Lease；目录 0700、文件 0600
 ├── harness/            # 规则快照、合规报告与例外记录；文件权限为 0600
 ├── memory/             # Session、Turn、长期记忆和执行上下文快照；文件权限为 0600
 ├── goals/              # Goal 记录与不可变 GoalSnapshot；文件权限为 0600
@@ -210,6 +212,7 @@ npm run check           # 完整检查
 - [可视化控制台](docs/UI.md)
 - [Harness Engineering 规则与门禁](docs/HARNESS_ENGINEERING.md)
 - [会话与记忆](docs/MEMORY.md)
+- [受治理的多 Agent 协作](docs/COLLABORATION.md)
 
 ## MVP 边界
 
