@@ -27,7 +27,7 @@ npm run ui
 
 The layout follows the quiet, content-first principles used by agent orchestration tools such as Orca:
 
-- compact left navigation led by Dashboard and first-class 目标, followed by Workspaces, delivery flow, Automation, integrations, Agents, Skills, and runs; the `<<` control collapses it to a persistent icon rail that retains the CJHX logo, compact CJHX label, and bottom theme control, and `>>` restores the full menu;
+- compact left navigation led by Dashboard and first-class 目标, followed by Workspaces, delivery flow, Automation, integrations, Agents, Skills, and runs; the Skills badge loads the protected local catalog at startup and reports the deduplicated total of locally discovered and separately installed Skills; the `<<` control collapses it to a persistent icon rail that retains the CJHX logo, compact CJHX label, and bottom theme control, and `>>` restores the full menu;
 - persistent work-item switching and search; `⌘K` / `Ctrl+K` expands a collapsed desktop sidebar before focusing search, while low-height sidebars keep navigation and work-item lists independently scrollable;
 - a central lifecycle canvas that makes the current stage and full delivery path visible;
 - contextual evidence, gate, transition, and Agentic Action panels;
@@ -40,8 +40,8 @@ The UI supports:
 2. creating, editing, activating, and confirming Workspace-bound Goals from the first-class “目标” entry;
 3. defining structured success criteria, current/baseline/target values, authoritative source references, scope, exclusions, constraints, linked Changes, target dates, and review cadence;
 4. inspecting deterministic Goal health, linked Change/Task execution mapping, Automation Findings, and immutable GoalSnapshot digests;
-5. creating and searching changes;
-6. viewing all 12 lifecycle stages;
+5. opening the 研发流程 overview to discover every Change, including drafts and Changes without a Workspace, then selecting a Change to inspect its existing delivery detail;
+6. viewing all 12 lifecycle stages and the selected Change's aggregated Agent token usage, including input, output, reasoning, cache read/write, measured versus estimated totals, unavailable runs, and refresh status;
 7. adding typed evidence;
 8. advancing or returning lifecycle state through enforced gates;
 9. scanning local pi, Claude, Codex, Qoder, enterprise, and project Skill directories for `SKILL.md` or `skill.json`, then enabling or disabling discovered Skills without deleting their sources;
@@ -70,7 +70,7 @@ The UI supports:
 32. explicitly remembering, correcting, forgetting, pinning, and tracing Task/Change/Workspace memory without treating it as authoritative evidence;
 33. creating, editing, enabling, disabling, and immediately running the built-in daily repository review from the first-class “自动化” navigation entry;
 34. switching between “自动化任务” and “审计报告”, viewing deterministic findings, stale state, release readiness/prediction, blocked-task summaries, source completeness, and Automation Run token totals;
-35. viewing a compact top-right Token meter for the active or most recent Task, with separate provider/driver-reported, estimated, unavailable, cache, and reasoning counters.
+35. viewing a compact top-right Token meter for the active or most recent Task, with separate provider/driver-reported, estimated, unavailable, cache, and reasoning counters; Change detail uses the same protected local usage facts through a Change-scoped aggregation rather than recomputing totals in the browser.
 
 ## Security boundary
 

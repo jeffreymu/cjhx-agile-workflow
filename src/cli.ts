@@ -52,7 +52,7 @@ Commands:
   automation-runs [--automation-id ID]
   automation-findings [--automation-id ID]
   automation-report REPORT_ID
-  agent-usage [--kind all|run|session|task|workspace|automation|automation-run] [--id ID]
+  agent-usage [--kind all|run|session|task|change|workspace|automation|automation-run] [--id ID]
   ui [--host 127.0.0.1] [--port 4317] [--no-open]
 `;
 
@@ -113,7 +113,7 @@ async function execute(parsed: Parsed): Promise<unknown> {
     case "automation-runs": return app.automations.listRuns(option(parsed, "--automation-id"));
     case "automation-findings": return app.automations.listFindings(option(parsed, "--automation-id"));
     case "automation-report": return app.automations.getReport(position(parsed, 0, "report id"));
-    case "agent-usage": { const kind = option(parsed, "--kind") ?? "all"; if (!["all", "run", "session", "task", "workspace", "automation", "automation-run"].includes(kind)) throw new Error(`invalid usage kind: ${kind}`); const id = option(parsed, "--id"); if (kind !== "all" && !id) throw new Error("--id is required for scoped usage"); return app.agents.usageSummary({ kind: kind as "all" | "run" | "session" | "task" | "workspace" | "automation" | "automation-run", ...(id ? { id } : {}) }); }
+    case "agent-usage": { const kind = option(parsed, "--kind") ?? "all"; if (!["all", "run", "session", "task", "change", "workspace", "automation", "automation-run"].includes(kind)) throw new Error(`invalid usage kind: ${kind}`); const id = option(parsed, "--id"); if (kind !== "all" && !id) throw new Error("--id is required for scoped usage"); return app.agents.usageSummary({ kind: kind as "all" | "run" | "session" | "task" | "change" | "workspace" | "automation" | "automation-run", ...(id ? { id } : {}) }); }
     case "ui": { const rawPort = option(parsed, "--port") ?? "4317"; const port = Number(rawPort); if (!Number.isInteger(port)) throw new Error(`invalid UI port: ${rawPort}`); const ui = createUiServer(app, { host: option(parsed, "--host") ?? "127.0.0.1", port, open: !parsed.flags.has("--no-open") }); return await ui.listen(); }
     default: throw new Error(usage);
   }
