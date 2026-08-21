@@ -11,7 +11,7 @@ export interface IssuedCollaborationCapability { id: string; token: string; expi
 export interface SendAgentMessageInput { recipient: AgentMessage["recipient"]; type: AgentMessageType; subject: string; body: string; artifactRefs?: string[]; correlationId?: string; replyTo?: string }
 export interface DelegationRequest { agentId: string; role: string; mode: "read-only" | "write"; objective: string; acceptanceCriteria: string[]; dependencyIds?: string[] }
 export interface CollaborationBridgeAddress { host: "127.0.0.1"; port: number; url: string }
-interface CapabilityContext { capability: CollaborationCapability; assignment: AgentAssignment }
+export interface CapabilityContext { capability: CollaborationCapability; assignment: AgentAssignment }
 interface CollaborationBridgeOptions { delegate?: (context: CapabilityContext, input: DelegationRequest) => unknown }
 
 const identifier = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;

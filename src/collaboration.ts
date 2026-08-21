@@ -31,7 +31,7 @@ export interface AgentAssignment {
   objective: string; acceptanceCriteria: string[]; mode: "read-only" | "write"; dependencyIds: string[]; status: AssignmentStatus;
   worktreeLeaseId?: string; agentRunId?: string;
   proposedBy: { kind: "human"; actor: string } | { kind: "agent"; agentId: string; runId: string };
-  output?: AssignmentOutput; createdAt: string; startedAt?: string; completedAt?: string;
+  policyViolations?: string[]; output?: AssignmentOutput; createdAt: string; startedAt?: string; completedAt?: string;
 }
 export interface AgentMessage {
   schemaVersion: 1; id: string; collaborationId: string; workspaceId: string; changeId: string; taskId: string;
