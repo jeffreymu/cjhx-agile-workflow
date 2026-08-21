@@ -13,7 +13,7 @@ function fixture(t: test.TestContext) {
   const root = mkdtempSync(resolve(tmpdir(), "cjhx-agents-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const repository = resolve(root, "repo"); mkdirSync(repository); const state = new Workspace(resolve(root, ".cjhx")); state.initialize();
   const script = resolve(root, "fake-agent.mjs");
-  writeFileSync(script, `if (process.argv.includes("--version")) { console.log("fake-agent 1.2.3"); process.exit(0); }\nlet input=""; for await (const chunk of process.stdin) input += chunk; console.log(JSON.stringify({cwd:process.cwd(),prompt:process.argv.at(-1),stdin:input}));\n`);
+  writeFileSync(script, `if (process.argv.includes("--version")) { console.log("fake-agent 1.2.3"); process.exit(0); }\nlet input=""; for await (const chunk of process.stdin) input += chunk; console.log(JSON.stringify({cwd:process.cwd(),argv:process.argv.slice(2),prompt:process.argv.at(-1),stdin:input}));\n`);
   chmodSync(script, 0o700); const tasks: Task[] = [{ id: "task-1", changeId: "CHANGE-1", workspaceId: "workspace-1", title: "Implement agent support", description: "Add configuration and execution", owner: "dev", priority: "P1", riskLevel: "L2", status: "in_progress", authority: "local-draft", acceptanceCriteria: ["Agent run is recorded"], dependencies: [], evidenceRefs: [], history: [], createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }];
   const service = new AgentService(state, { task: (id) => { const task = tasks.find((item) => item.id === id); if (!task) throw new Error("missing task"); return task; }, workspace: () => ({ id: "workspace-1", kind: "local", rootPath: repository }) });
   return { root, repository, script, state, service };
@@ -67,6 +67,19 @@ test("pi agent profiles are supported and become the default for development tas
   assert.equal(completed.status, "succeeded"); assert.equal(completed.agentKind, "pi"); assert.equal(JSON.parse(completed.stdout.trim()).cwd && realpathSync(JSON.parse(completed.stdout.trim()).cwd), realpathSync(repository));
   const usage = parseAgentUsage('CJHX_USAGE:{"source":"provider-reported","inputTokens":42,"outputTokens":7}', "pi");
   assert.equal(usage?.source, "provider-reported"); assert.equal(usage?.totalTokens, 49);
+});
+
+test("DeepSeek Harness profiles run headless tasks as a native Agent kind", async (t) => {
+  const { repository, script, service } = fixture(t);
+  const profile = await service.save({ id: "deepseek-harness", name: "DeepSeek Harness", kind: "deepseek-harness", command: process.execPath, arguments: [script, "--profile", "headless", "{prompt}"], versionArguments: [script, "--version"], promptTransport: "argument", timeoutMinutes: 5, environmentKeys: [] }, { approved: true });
+  assert.equal(profile.kind, "deepseek-harness");
+  const completed = await waitForRun(service, service.startTask("task-1", { approved: true }).id);
+  assert.equal(completed.status, "succeeded"); assert.equal(completed.agentKind, "deepseek-harness");
+  const output = JSON.parse(completed.stdout.trim()) as { cwd: string; argv: string[]; prompt: string };
+  assert.equal(realpathSync(output.cwd), realpathSync(repository)); assert.deepEqual(output.argv.slice(0, 2), ["--profile", "headless"]); assert.match(output.prompt, /Implement agent support/);
+  assert.equal(normalizeAgentResponse("DeepSeek Harness final output", "deepseek-harness"), "DeepSeek Harness final output");
+  const usage = parseAgentUsage('CJHX_USAGE:{"source":"provider-reported","inputTokens":50,"outputTokens":10}', "deepseek-harness");
+  assert.equal(usage?.source, "provider-reported"); assert.equal(usage?.totalTokens, 60);
 });
 
 test("agent terminal verification requires approval and launches a quoted script", async (t) => {

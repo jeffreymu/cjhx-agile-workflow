@@ -35,7 +35,7 @@ CJHX Agile Workflow is a TypeScript-first, skill-driven Agentic SDLC control pla
 - `tasks.ts` — local draft task state machine; publishing hands authority to Jira.
 - `policy.ts` — risk levels (S0–S6), source allowlist, approval policy.
 - `harness.ts` — Harness Engineering: immutable rule snapshots from `cjhx.harness.json`, digest-bound approval, preflight, executor-capability honesty, postflight checks, Task gates.
-- `agents.ts` — `AgentService` + `AgentExecutor` seam (`LocalProcessExecutor` is MVP-only, not a sandbox); supported kinds: `pi` (default preset), `claude-code`, `codex`, `qoder`, `custom`.
+- `agents.ts` — `AgentService` + `AgentExecutor` seam (`LocalProcessExecutor` is MVP-only, not a sandbox); supported kinds: `pi` (default preset), `claude-code`, `codex`, `qoder`, `deepseek-harness`, `custom`.
 - `agent-terminal.ts` — approval-gated local terminal verification: builds a single-quote-escaped version-test + interactive-session script (mode `0700`, temp dir) and opens it with the platform terminal via argument arrays, never a shell.
 - `conversations.ts` / `memory.ts` — task-scoped Sessions/Turns, explicit durable memory, immutable `MemorySnapshot` / `ExecutionContextSnapshot`; history is non-instructional data.
 - `goals.ts` / `dashboard.ts` — `Goal → Change → Task` contracts with immutable `GoalSnapshot`; dashboard is read-only aggregation.

@@ -63,7 +63,7 @@ The UI supports:
 25. creating/removing local worktrees, branches, and tags with explicit human approval;
 26. importing configured GitLab/GitHub repositories as virtual Workspaces without cloning them;
 27. browsing remote directory trees, files, refs, commits, issue, PR/MR, and comments as live Provider projections;
-28. configuring multiple Pi, Claude Code, Codex, Qoder, or custom non-interactive Agent CLI profiles, testing their executables with approval, choosing a default Agent, and opening a local terminal window from an Agent card to manually verify the configured command (version test followed by an interactive session);
+28. configuring multiple Pi, Claude Code, Codex, Qoder, DeepSeek Harness, or custom non-interactive Agent CLI profiles, testing their executables with approval, choosing a default Agent, and opening a local terminal window from an Agent card to manually verify the configured command (version test followed by an interactive session);
 29. previewing the effective Harness rule digest, preflight checks, executor capabilities, postflight checks, and Task gates before approving task-scoped Agent execution;
 30. launching approved task development in the task's local Workspace and inspecting Agent process status separately from Harness compliance, including immutable rule digest and per-check results;
 31. creating Task-bound Agent Sessions, continuing multi-turn conversations across configured Agents, and inspecting each Turn's immutable MemorySnapshot;
