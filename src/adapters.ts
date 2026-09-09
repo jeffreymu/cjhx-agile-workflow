@@ -12,9 +12,10 @@ export interface DevOpsAdapter {
   triggerPipeline(request: JsonObject): Awaitable<JsonObject>; controlService(request: JsonObject): Awaitable<JsonObject>;
 }
 export interface ObservabilityAdapter { getDeploymentHealth(id: string): Awaitable<JsonObject>; getRelatedIncidents(id: string): Awaitable<JsonObject[]> }
+export interface KnowledgeAdapter { search(request: JsonObject): Awaitable<JsonObject> }
 
 export interface ToolOperation { tool: string; arguments: JsonObject }
-export interface ToolAdapters { jira?: JiraAdapter; confluence?: ConfluenceAdapter; sourceControl?: SourceControlAdapter; devops?: DevOpsAdapter; observability?: ObservabilityAdapter }
+export interface ToolAdapters { jira?: JiraAdapter; confluence?: ConfluenceAdapter; sourceControl?: SourceControlAdapter; devops?: DevOpsAdapter; observability?: ObservabilityAdapter; knowledge?: KnowledgeAdapter }
 
 function stringArg(args: JsonObject, key: string): string { const value = args[key]; if (typeof value !== "string") throw new AdapterError(`missing tool argument: ${key}`); return value; }
 function objectArg(args: JsonObject, key: string): JsonObject { const value = args[key]; if (typeof value !== "object" || value === null || Array.isArray(value)) throw new AdapterError(`missing tool argument: ${key}`); return value; }
@@ -25,8 +26,32 @@ export class ToolBroker {
   getAdapter<K extends keyof ToolAdapters>(name: K): ToolAdapters[K] { return this.adapters[name]; }
   setAdapter<K extends keyof ToolAdapters>(name: K, adapter: NonNullable<ToolAdapters[K]>): void { this.adapters[name] = adapter; }
   removeAdapter(name: keyof ToolAdapters): void { delete this.adapters[name]; }
-  async execute(operation: ToolOperation, permissions: Set<string>): Promise<JsonObject> {
+  validate(operation: ToolOperation, permissions: Set<string>): void {
     if (!permissions.has(operation.tool)) throw new PolicyDenied(`skill has no permission for tool: ${operation.tool}`);
+    const a = this.adapters;
+    switch (operation.tool) {
+      case "jira.issue.read": this.need(a.jira, operation.tool); stringArg(operation.arguments, "key"); break;
+      case "jira.issue.create": this.need(a.jira, operation.tool); objectArg(operation.arguments, "fields"); break;
+      case "jira.issue.update": this.need(a.jira, operation.tool); stringArg(operation.arguments, "key"); objectArg(operation.arguments, "fields"); break;
+      case "jira.issue.transition": this.need(a.jira, operation.tool); stringArg(operation.arguments, "key"); stringArg(operation.arguments, "state"); break;
+      case "confluence.page.read": this.need(a.confluence, operation.tool); stringArg(operation.arguments, "pageId"); break;
+      case "confluence.page.create-draft": this.need(a.confluence, operation.tool); objectArg(operation.arguments, "page"); break;
+      case "confluence.page.update-draft": this.need(a.confluence, operation.tool); stringArg(operation.arguments, "pageId"); objectArg(operation.arguments, "page"); break;
+      case "scm.repository.read": this.need(a.sourceControl, operation.tool); stringArg(operation.arguments, "repositoryId"); break;
+      case "scm.branch.create": this.need(a.sourceControl, operation.tool); stringArg(operation.arguments, "repositoryId"); stringArg(operation.arguments, "name"); stringArg(operation.arguments, "revision"); break;
+      case "scm.change-request.create": this.need(a.sourceControl, operation.tool); objectArg(operation.arguments, "request"); break;
+      case "scm.commit-status.publish": this.need(a.sourceControl, operation.tool); objectArg(operation.arguments, "status"); break;
+      case "devops.validation.trigger": case "devops.artifact.build": case "devops.artifact.deploy": case "devops.pipeline.list": case "devops.pipeline-runs.list": case "devops.artifact.list": case "devops.service.list": case "devops.pipeline.trigger": case "devops.service.control": this.need(a.devops, operation.tool); objectArg(operation.arguments, "request"); break;
+      case "devops.validation.read": this.need(a.devops, operation.tool); stringArg(operation.arguments, "runId"); break;
+      case "devops.deployment.read": this.need(a.devops, operation.tool); stringArg(operation.arguments, "deploymentId"); break;
+      case "observability.deployment-health.read": this.need(a.observability, operation.tool); stringArg(operation.arguments, "deploymentId"); break;
+      case "observability.incidents.read": this.need(a.observability, operation.tool); stringArg(operation.arguments, "serviceId"); break;
+      case "knowledge.search": this.need(a.knowledge, operation.tool); break;
+      default: throw new AdapterError(`unknown tool: ${operation.tool}`);
+    }
+  }
+  async execute(operation: ToolOperation, permissions: Set<string>): Promise<JsonObject> {
+    this.validate(operation, permissions);
     const a = this.adapters; let result: JsonValue;
     switch (operation.tool) {
       case "jira.issue.read": result = await this.need(a.jira, operation.tool).getIssue(stringArg(operation.arguments, "key")); break;
@@ -53,6 +78,7 @@ export class ToolBroker {
       case "devops.service.control": result = await this.need(a.devops, operation.tool).controlService(objectArg(operation.arguments, "request")); break;
       case "observability.deployment-health.read": result = await this.need(a.observability, operation.tool).getDeploymentHealth(stringArg(operation.arguments, "deploymentId")); break;
       case "observability.incidents.read": result = await this.need(a.observability, operation.tool).getRelatedIncidents(stringArg(operation.arguments, "serviceId")); break;
+      case "knowledge.search": result = await this.need(a.knowledge, operation.tool).search(operation.arguments); break;
       default: throw new AdapterError(`unknown tool: ${operation.tool}`);
     }
     return { tool: operation.tool, result };
@@ -75,6 +101,11 @@ export class InMemoryConfluenceAdapter implements ConfluenceAdapter {
   getPage(id: string): JsonObject { const page = this.pages.get(id); if (!page) throw new AdapterError(`Confluence page not found: ${id}`); return { ...page }; }
   createDraft(page: JsonObject): JsonObject { const id = String(page.id ?? this.pages.size + 1); const created = { id, status: "draft", ...page }; this.pages.set(id, created); return { ...created }; }
   updateDraft(id: string, page: JsonObject): JsonObject { const current = this.getPage(id); if (current.status !== "draft") throw new AdapterError("only draft pages may be updated"); const updated = { ...current, ...page }; this.pages.set(id, updated); return updated; }
+}
+
+export class InMemoryKnowledgeAdapter implements KnowledgeAdapter {
+  readonly requests: JsonObject[] = []; constructor(readonly results: JsonObject = { matches: [] }) {}
+  search(request: JsonObject): JsonObject { this.requests.push(request); return { ...this.results }; }
 }
 
 export class InMemoryDevOpsAdapter implements DevOpsAdapter {

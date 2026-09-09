@@ -30,6 +30,8 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 - Harness Engineering：从版本化 `cjhx.harness.json` 编译不可变规则快照，将 Agent 审批绑定 SHA-256 摘要，执行受批准的 postflight checks，分别记录 Agent 状态与合规状态，并以代码状态锁定的 Compliance Report 约束 Task 门禁；
 - 会话与记忆：以 Task 为范围创建可恢复的多轮 Agent Session，允许在不同 Agent 间继续；每轮执行绑定不可变 MemorySnapshot 和完整 ExecutionContextSnapshot，长期记忆仅由用户显式记住、纠正、遗忘或固定；
 - 自动化工程审计：一级菜单“自动化”提供内置 `daily-repository-review`，按日或工作日只读汇总依赖变化、测试/Harness 失败、风险变更、发布健康与明确/疑似卡住 Task；每次运行绑定 Definition Snapshot、Signal Snapshot、Git 状态和稳定 Finding 指纹，支持手工运行、启停、本地补跑与历史报告；
+- 测试工作台：一级菜单“测试工作台”按测试设计、测试执行、智能分析和测试治理组织用例生成、接口测试、缺陷分析、日志分析、SQL 分析和测试报告；能力由显式版本和 SHA-256 摘要锁定的 Skill 提供，可组合为固定步骤快照的 AI 测试流程；
+- 企业测试知识：通过只读 `KnowledgeAdapter` 和 `ToolBroker` 显式选择历史用例、缺陷、需求、日志规范、表结构和 SQL 规范；配置只保存非凭据引用，检索结果有大小上限，审计只记录来源 ID，Skill 输出、证据和错误不得逐字持久化受保护知识；
 - Agent Token 用量：AgentRun 记录 Provider/Driver 结构化计量、本地估算或 unavailable 状态，按 Run、Session、Task、Workspace、Automation 与 Automation Run 动态聚合，并在页面右上角实时展示当前/最近 Task 用量；
 - Workspace Hub：以 Workspace 为范围提供 Overview、Kanban、Sessions、Team 和 Codebase 视图；Kanban 与全局任务看板复用同一投影和交互；支持导入/移除本地 Git 仓库，搜索文件，管理经审批的 worktree 与 Git refs，浏览并检查提交；
 - 虚拟 Workspace：无需克隆即可导入已配置的 GitLab/GitHub 仓库，实时浏览目录、文件、refs、提交、issue、PR/MR 和评论。
@@ -42,7 +44,8 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 | Confluence | 需求、用例、技术方案、ADR、测试策略和复盘 |
 | 代码托管平台 | 仓库、分支、提交、代码变更请求和代码评审 |
 | DevOps 平台 | 构建、扫描、测试、质量门禁、制品、部署和回滚 |
-| CJHX | 生命周期编排、Skill 运行、权限策略、证据索引和审计 |
+| CJHX | 生命周期编排、测试工作台、Skill 运行、权限策略、证据索引和审计 |
+| 企业研发知识库 | 历史用例、缺陷、需求、日志规范、表结构和 SQL 规范；CJHX 只保存只读仓库引用和来源 ID |
 | 运行观测平台 | 暂不建设，通过 `ObservabilityAdapter` 预留 |
 
 框架核心不绑定任何具体代码托管产品。
@@ -100,6 +103,7 @@ npm run ui
 ├── agents/             # Agent CLI 配置；文件权限为 0600
 ├── agent-runs/         # 任务级 Agent 运行与输出；文件权限为 0600
 ├── collaborations/     # Plan、Assignment、消息、Capability 与 Worktree Lease；目录 0700、文件 0600
+├── test-workbench/     # 知识源引用、能力绑定和固定版本测试流程；文件权限为 0600
 ├── harness/            # 规则快照、合规报告与例外记录；文件权限为 0600
 ├── memory/             # Session、Turn、长期记忆和执行上下文快照；文件权限为 0600
 ├── goals/              # Goal 记录与不可变 GoalSnapshot；文件权限为 0600

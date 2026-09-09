@@ -1,0 +1,14 @@
+{
+  "id": "test.report.generate",
+  "version": "1.0.0",
+  "name": "测试报告",
+  "description": "汇总测试流程输入、上游输出和知识引用形成结构化报告",
+  "owner": "cjhx-quality-team",
+  "source": "internal",
+  "riskLevel": "S1",
+  "entrypoint": {"type": "builtin", "target": "test_report_generate"},
+  "permissions": [],
+  "tags": ["testing", "report", "governance"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": false
+}

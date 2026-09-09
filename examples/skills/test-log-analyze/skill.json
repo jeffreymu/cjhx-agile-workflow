@@ -1,0 +1,14 @@
+{
+  "id": "test.log.analyze",
+  "version": "1.0.0",
+  "name": "日志分析",
+  "description": "依据日志规范和历史缺陷输出结构化异常线索",
+  "owner": "cjhx-quality-team",
+  "source": "internal",
+  "riskLevel": "S1",
+  "entrypoint": {"type": "builtin", "target": "test_log_analyze"},
+  "permissions": [],
+  "tags": ["testing", "logs", "analysis"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": false
+}

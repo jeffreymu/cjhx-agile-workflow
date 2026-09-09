@@ -12,12 +12,12 @@ const requirementDecompose: BuiltinHandler = (payload) => {
 };
 
 const testCaseGenerate: BuiltinHandler = (payload) => {
-  const feature = typeof payload.feature === "string" ? payload.feature.trim() : "";
+  const request = requestObject(payload); const feature = typeof request.feature === "string" ? request.feature.trim() : "";
   if (!feature) throw new SkillError("feature is required");
-  const criteria = Array.isArray(payload.acceptanceCriteria) ? payload.acceptanceCriteria : [];
+  const criteria = Array.isArray(request.acceptanceCriteria) ? request.acceptanceCriteria : [];
   const cases = criteria.map((item, index) => ({ id: `TC-${String(index + 1).padStart(3, "0")}`, type: "acceptance", given: "系统可用且测试数据已准备", when: String(item), then: `满足验收标准：${String(item)}` }));
   cases.push({ id: `TC-${String(cases.length + 1).padStart(3, "0")}`, type: "boundary", given: "输入处于允许范围边界", when: `执行 ${feature}`, then: "系统返回明确且可验证的结果" });
-  return { output: { feature, testCases: cases }, evidence: [], operations: [] };
+  return { output: { feature, testCases: cases, knowledgeSourcesUsed: knowledgeSourceCount(payload), previous: payload.previous ?? null }, evidence: [], operations: [] };
 };
 
 const jiraConfluenceSync: BuiltinHandler = (payload) => {
@@ -39,13 +39,18 @@ const codeReview: BuiltinHandler = (payload) => {
 };
 
 const apiTestExecute: BuiltinHandler = (payload) => {
-  const changeId = payload.changeId;
-  const suiteRef = payload.suiteRef;
-  const environment = payload.environment;
+  const request = requestObject(payload); const changeId = request.changeId; const suiteRef = request.suiteRef; const environment = request.environment;
   if (typeof changeId !== "string" || typeof suiteRef !== "string" || typeof environment !== "string" || !changeId || !suiteRef || !environment) {
     throw new SkillError("changeId, suiteRef, and environment are required");
   }
-  return { output: { status: "validation-requested", changeId }, evidence: [], operations: [{ tool: "devops.validation.trigger", arguments: { request: { changeId, validationType: "api", suiteRef, environment, subjectRef: payload.subjectRef ?? null } } }] };
+  return { output: { status: "validation-requested", changeId, knowledgeSourcesUsed: knowledgeSourceCount(payload), previous: payload.previous ?? null }, evidence: [], operations: [{ tool: "devops.validation.trigger", arguments: { request: { changeId, validationType: "api", suiteRef, environment, subjectRef: request.subjectRef ?? null } } }] };
 };
 
-export const builtins: Record<string, BuiltinHandler> = { requirement_decompose: requirementDecompose, test_case_generate: testCaseGenerate, jira_confluence_sync: jiraConfluenceSync, code_review: codeReview, api_test_execute: apiTestExecute };
+function requestObject(payload: JsonObject): JsonObject { const request = payload.request; return typeof request === "object" && request !== null && !Array.isArray(request) ? request : payload; }
+function knowledgeSourceCount(payload: JsonObject): number { return Array.isArray(payload.knowledge) ? payload.knowledge.length : 0; }
+const defectAnalyze: BuiltinHandler = (payload) => { const request = requestObject(payload); const defect = String(request.defect ?? request.description ?? "").trim(); if (!defect) throw new SkillError("defect or description is required"); return { output: { summary: `已分析缺陷：${defect}`, likelyCauses: ["待结合执行结果与日志验证"], knowledgeSourcesUsed: knowledgeSourceCount(payload), previous: payload.previous ?? null }, evidence: [], operations: [] }; };
+const logAnalyze: BuiltinHandler = (payload) => { const request = requestObject(payload); const logs = String(request.logs ?? "").trim(); if (!logs) throw new SkillError("logs is required"); const errorLines = logs.split("\n").filter((line) => /error|exception|fail/i.test(line)); return { output: { summary: `发现 ${errorLines.length} 条异常日志`, errorLines: errorLines.slice(0, 50), knowledgeSourcesUsed: knowledgeSourceCount(payload), previous: payload.previous ?? null }, evidence: [], operations: [] }; };
+const sqlAnalyze: BuiltinHandler = (payload) => { const request = requestObject(payload); const sql = String(request.sql ?? "").trim(); if (!sql) throw new SkillError("sql is required"); const findings: JsonObject[] = []; if (/select\s+\*/i.test(sql)) findings.push({ severity: "warning", rule: "avoid-select-star" }); if (!/\bwhere\b/i.test(sql) && /\b(update|delete)\b/i.test(sql)) findings.push({ severity: "blocker", rule: "mutation-without-where" }); return { output: { summary: `${findings.length} 个 SQL 风险`, findings, knowledgeSourcesUsed: knowledgeSourceCount(payload), previous: payload.previous ?? null }, evidence: [], operations: [] }; };
+const testReportGenerate: BuiltinHandler = (payload) => { const request = requestObject(payload); return { output: { title: String(request.title ?? "AI 测试报告"), status: "generated", summary: String(request.summary ?? "已汇总测试流程输入和上一步结果"), previous: payload.previous ?? null, knowledgeSourcesUsed: knowledgeSourceCount(payload) }, evidence: [], operations: [] }; };
+
+export const builtins: Record<string, BuiltinHandler> = { requirement_decompose: requirementDecompose, test_case_generate: testCaseGenerate, jira_confluence_sync: jiraConfluenceSync, code_review: codeReview, api_test_execute: apiTestExecute, test_defect_analyze: defectAnalyze, test_log_analyze: logAnalyze, test_sql_analyze: sqlAnalyze, test_report_generate: testReportGenerate };

@@ -42,6 +42,8 @@ export class Workspace {
   readonly collaborationMessages: string;
   readonly collaborationCapabilities: string;
   readonly collaborationWorktreeLeases: string;
+  readonly testWorkbench: string;
+  readonly testWorkbenchConfig: string;
   readonly goals: string;
   readonly goalRecords: string;
   readonly goalSnapshots: string;
@@ -83,6 +85,8 @@ export class Workspace {
     this.collaborationMessages = resolve(this.collaborations, "messages");
     this.collaborationCapabilities = resolve(this.collaborations, "capabilities");
     this.collaborationWorktreeLeases = resolve(this.collaborations, "worktree-leases");
+    this.testWorkbench = resolve(this.root, "test-workbench");
+    this.testWorkbenchConfig = resolve(this.testWorkbench, "config.json");
     this.goals = resolve(this.root, "goals");
     this.goalRecords = resolve(this.goals, "records");
     this.goalSnapshots = resolve(this.goals, "snapshots");
@@ -99,7 +103,7 @@ export class Workspace {
 
   initialize(): void {
     [this.root, this.changes, this.skills, this.runs, this.tasks, this.workspaces, this.integrations, this.agents, this.agentRuns, this.harness, this.ruleSnapshots, this.complianceReports].forEach((path) => mkdirSync(path, { recursive: true }));
-    [this.memory, this.agentSessions, this.agentTurns, this.memoryRecords, this.memorySnapshots, this.executionContexts, this.collaborations, this.collaborationRecords, this.collaborationPlanSnapshots, this.collaborationAssignments, this.collaborationMessages, this.collaborationCapabilities, this.collaborationWorktreeLeases, this.goals, this.goalRecords, this.goalSnapshots, this.automations, this.automationDefinitions, this.automationDefinitionSnapshots, this.automationClaims, this.automationSignalSnapshots, this.automationRuns, this.automationFindings, this.automationReports].forEach((path) => this.ensurePrivateDirectory(path));
+    [this.memory, this.agentSessions, this.agentTurns, this.memoryRecords, this.memorySnapshots, this.executionContexts, this.collaborations, this.collaborationRecords, this.collaborationPlanSnapshots, this.collaborationAssignments, this.collaborationMessages, this.collaborationCapabilities, this.collaborationWorktreeLeases, this.testWorkbench, this.goals, this.goalRecords, this.goalSnapshots, this.automations, this.automationDefinitions, this.automationDefinitionSnapshots, this.automationClaims, this.automationSignalSnapshots, this.automationRuns, this.automationFindings, this.automationReports].forEach((path) => this.ensurePrivateDirectory(path));
     if (!existsSync(this.lockfile)) this.writeJson(this.lockfile, { schemaVersion: 1, skills: {} });
   }
 
@@ -183,6 +187,9 @@ export class Workspace {
   saveWorktreeLease(value: WorktreeLease): void { this.initialize(); this.writePrivateJson(this.entityPath(this.collaborationWorktreeLeases, value.id, "worktree lease id"), value as unknown as JsonValue); }
   getWorktreeLease(id: string): WorktreeLease { return this.readPrivateJson(this.entityPath(this.collaborationWorktreeLeases, id, "worktree lease id")) as unknown as WorktreeLease; }
   listWorktreeLeases(): WorktreeLease[] { this.initialize(); return this.jsonFiles(this.collaborationWorktreeLeases).map((path) => this.readPrivateJson(path) as unknown as WorktreeLease).sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
+  testWorkbenchConfigExists(): boolean { return existsSync(this.testWorkbenchConfig); }
+  getTestWorkbenchConfig(): JsonValue { return this.readPrivateJson(this.testWorkbenchConfig); }
+  saveTestWorkbenchConfig(value: JsonValue): void { this.initialize(); this.writePrivateJson(this.testWorkbenchConfig, value); }
   saveGoal(value: Goal): void { this.initialize(); this.writePrivateJson(this.entityPath(this.goalRecords, value.id, "goal id"), value as unknown as JsonValue); }
   getGoal<T = Goal>(id: string): T { return this.readPrivateJson(this.entityPath(this.goalRecords, id, "goal id")) as unknown as T; }
   listGoals<T = Goal>(): T[] { this.initialize(); return this.jsonFiles(this.goalRecords).map((path) => this.readPrivateJson(path) as unknown as T); }

@@ -36,13 +36,18 @@ export class Policy {
     if (manifest.entrypoint.type === "process" && !this.allowProcessSkills) throw new PolicyDenied("process skills are disabled");
   }
 
+  requiresApproval(manifest: SkillManifest): boolean {
+    const exceedsAutomaticRisk = Number(manifest.riskLevel.slice(1)) > Number(this.maxAutomaticRisk.slice(1));
+    const writes = manifest.permissions.some((permission) => writePermissions.has(permission));
+    return exceedsAutomaticRisk || manifest.requiresHumanConfirmation || (writes && this.requireApprovalForWrite);
+  }
+
   checkRun(manifest: SkillManifest, approved: boolean): void {
     this.checkInstall(manifest);
     if (Number(manifest.riskLevel.slice(1)) > Number(this.maxAutomaticRisk.slice(1)) && !approved) {
       throw new PolicyDenied(`skill risk ${manifest.riskLevel} exceeds automatic limit ${this.maxAutomaticRisk}`);
     }
-    const writes = manifest.permissions.some((permission) => writePermissions.has(permission));
-    if ((manifest.requiresHumanConfirmation || (writes && this.requireApprovalForWrite)) && !approved) {
+    if (this.requiresApproval(manifest) && !approved) {
       throw new PolicyDenied("skill requires human approval before write operations");
     }
   }

@@ -13,6 +13,8 @@ CJHX Agile Workflow is a TypeScript-first, platform-neutral, skill-driven Agenti
 | Repositories, commits, change requests, code review | Configurable source-control platform |
 | Build, verification, quality gates, artifacts, deployment | DevOps platform |
 | Skill versions and execution traces | CJHX workspace/registry |
+| Test capability bindings and immutable test-flow snapshots | CJHX workspace/registry |
+| Enterprise test knowledge | External read-only knowledge repositories; CJHX stores source IDs and non-credential references only |
 | Goal contracts, Goal Snapshots, and Goal-to-Change links | CJHX workspace |
 | Unpublished decomposed task drafts | CJHX workspace |
 | Published task status and assignment | Jira; CJHX stores a synchronized projection |
@@ -33,16 +35,20 @@ Conversation: Session + Turn + MemorySnapshot + execution-context approval
                  |
 Automation: Definition + Signal snapshot + deterministic findings + immutable report
                  |
+Testing: capability catalog + pinned Skill binding + immutable flow steps
+                 |
 Collaboration: approved plan + bounded Assignments + scoped messages + Worktree leases
                  |
 Harness: rule snapshot + preflight + executor capability + postflight + Task gate
                  |
 ToolBroker: permission-checked operations
                  |
-Adapters: Jira / Confluence / source control / DevOps / observability
+Adapters: Jira / Confluence / source control / DevOps / knowledge / observability
 ```
 
 The framework never gives platform credentials to a Skill. A Skill emits requested `operations`; `ToolBroker` verifies each operation against the immutable manifest permission list and invokes a configured adapter.
+
+`TestWorkbenchService` is a separate deep module over `SkillRegistry`, `SkillRuntime`, `WorkflowRuntime`, and a read-only `KnowledgeAdapter`. Its catalog exposes six visible capabilities grouped into testing design, execution, intelligent analysis, and governance. Capability bindings pin `skillId + semantic version + SHA-256 digest`; each saved flow version snapshots those values into version-qualified immutable step identities, and updates retain earlier versions for reproducible execution. The approval surface has a SHA-256 digest covering the flow ID/version, ordered step IDs and Skill pins, knowledge-source IDs, and effective approval requirements; execution must present that digest, so a stale UI cannot authorize a different flow version. Runs require a validated actor, explicit knowledge-source selection, compatible enabled sources, and concrete per-step approval for Skills that write or exceed automatic risk. Policy checks complete before enterprise knowledge retrieval. Knowledge retrieval passes only through `ToolBroker` permission `knowledge.search`, is capped at 20 explicitly selected sources and 512 KB both per source and in aggregate, and is minimized to compatible steps. Audit input records source IDs, approval facts, and request metadata rather than retrieved content. Process stdout and stderr are capped while streaming. Skill output, evidence, and requested Tool operations are independently checked before any Adapter operation; exact protected values in output keys, values, larger strings, structures, evidence, operation arguments, or persisted error details fail closed before side effects or persistence. This is a bounded verbatim-leak guard, not a semantic data-loss-prevention system; enterprise deployments still need classified retrieval, sandboxing, egress controls, and output review.
 
 `GoalService` owns Workspace-bound outcome contracts above Change and Task. It validates that linked Changes remain in the Goal Workspace, persists private mutable Goal records plus immutable SHA-256 `GoalSnapshot` history, gates activation on verifiable success criteria, and derives health from explicit criterion status, linked blocked Tasks, target date, and Automation Findings. Goal does not replace Jira, Confluence, Policy, Harness, or current user instructions and cannot grant Agent capabilities. `DashboardService` is a read-only aggregation seam over Goal, Change, Task, Agent, Harness, and Automation projections; it performs no writes or approvals.
 

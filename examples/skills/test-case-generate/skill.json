@@ -8,7 +8,7 @@
   "riskLevel": "S1",
   "entrypoint": {"type": "builtin", "target": "test_case_generate"},
   "permissions": [],
-  "tags": ["test", "quality"],
+  "tags": ["test", "quality", "test-case", "generation"],
   "timeoutSeconds": 30,
   "requiresHumanConfirmation": false
 }

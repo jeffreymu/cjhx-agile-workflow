@@ -1,0 +1,14 @@
+{
+  "id": "test.defect.analyze",
+  "version": "1.0.0",
+  "name": "缺陷分析",
+  "description": "关联测试输入和企业知识检索结果形成结构化缺陷分析",
+  "owner": "cjhx-quality-team",
+  "source": "internal",
+  "riskLevel": "S1",
+  "entrypoint": {"type": "builtin", "target": "test_defect_analyze"},
+  "permissions": [],
+  "tags": ["testing", "defect", "analysis"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": false
+}

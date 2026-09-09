@@ -20,6 +20,12 @@
     "dist/ui",
     "schemas",
     "config/cjhx.harness.example.json",
+    "examples/skills/test-case-generate",
+    "examples/skills/api-test-execute",
+    "examples/skills/test-defect-analyze",
+    "examples/skills/test-log-analyze",
+    "examples/skills/test-sql-analyze",
+    "examples/skills/test-report-generate",
     "README.md",
     "LICENSE"
   ],

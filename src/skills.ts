@@ -7,7 +7,7 @@ import { redact } from "./audit.js";
 import { builtins, type SkillResponse } from "./builtin-skills.js";
 import { SkillError, ValidationError } from "./errors.js";
 import type { JsonObject, JsonValue, SkillManifest, SkillRun } from "./models.js";
-import { isRecord, parseSkillManifest, utcNow } from "./models.js";
+import { isRecord, parseSkillManifest, utcNow, validateIdentifier } from "./models.js";
 import { Policy } from "./policy.js";
 import { Workspace, type SkillLockRecord } from "./storage.js";
 
@@ -77,6 +77,16 @@ export class SkillRegistry {
     if (digest !== record.digest) throw new SkillError(`installed skill digest mismatch: ${skillId}`);
     return { manifest, packagePath, digest };
   }
+
+  resolvePinned(skillId: string, version: string, expectedDigest: string): { manifest: SkillManifest; packagePath: string; digest: string } {
+    validateIdentifier(skillId, "skill id", /^[a-z0-9][a-z0-9._-]*$/); validateIdentifier(version, "skill version", /^[A-Za-z0-9][A-Za-z0-9._+-]*$/);
+    if (!/^sha256:[a-f0-9]{64}$/.test(expectedDigest)) throw new SkillError("invalid pinned Skill digest");
+    const skillsRoot = resolve(this.workspace.skills); const packagePath = resolve(skillsRoot, skillId, version);
+    if (!packagePath.startsWith(`${skillsRoot}${sep}`) || !existsSync(packagePath) || !lstatSync(packagePath).isDirectory()) throw new SkillError(`pinned skill is not installed: ${skillId}@${version}`);
+    const manifest = this.loadManifest(packagePath); const digest = packageDigest(packagePath);
+    if (manifest.id !== skillId || manifest.version !== version || digest !== expectedDigest) throw new SkillError(`pinned skill digest mismatch: ${skillId}@${version}`);
+    return { manifest, packagePath, digest };
+  }
 }
 
 function parseResponse(value: unknown): SkillResponse {
@@ -88,26 +98,66 @@ function parseResponse(value: unknown): SkillResponse {
   return { output: output as JsonObject, evidence: evidence as JsonObject[], operations: operations as ToolOperation[] };
 }
 
+export interface SkillOutputPolicy { maxBytes?: number; forbiddenValues?: JsonValue[] }
+
+export function assertOutputPolicy(value: JsonValue, policy: SkillOutputPolicy | undefined): void {
+  if (!policy) return;
+  const serialized = JSON.stringify(value);
+  if (policy.maxBytes !== undefined && Buffer.byteLength(serialized) > policy.maxBytes) throw new SkillError(`skill output exceeds ${policy.maxBytes} bytes`);
+  const forbiddenStrings = new Set<string>(); const forbiddenStructures = new Set<string>();
+  const addRepresentations = (protectedValue: string, target: Set<string>): void => {
+    if (protectedValue.length < 8) return;
+    target.add(protectedValue); target.add(Buffer.from(protectedValue, "utf8").toString("base64")); target.add(Buffer.from(protectedValue, "utf8").toString("hex")); target.add(encodeURIComponent(protectedValue));
+  };
+  const collect = (protectedValue: JsonValue): void => {
+    if (typeof protectedValue === "string") { addRepresentations(protectedValue, forbiddenStrings); return; }
+    if (Array.isArray(protectedValue)) { addRepresentations(JSON.stringify(protectedValue), forbiddenStructures); protectedValue.forEach(collect); return; }
+    if (typeof protectedValue === "object" && protectedValue !== null) { addRepresentations(JSON.stringify(protectedValue), forbiddenStructures); Object.entries(protectedValue).forEach(([key, item]) => { addRepresentations(key, forbiddenStrings); collect(item); }); }
+  };
+  policy.forbiddenValues?.forEach(collect);
+  if (!forbiddenStrings.size && !forbiddenStructures.size) return;
+  const protectedStrings = [...forbiddenStrings]; const candidateKeys: string[] = []; const candidateValues: string[] = [];
+  const inspectStrings = (candidate: JsonValue): boolean => {
+    if (typeof candidate === "string") { candidateValues.push(candidate); return protectedStrings.some((protectedValue) => candidate.includes(protectedValue)); }
+    if (Array.isArray(candidate)) return candidate.some(inspectStrings);
+    if (typeof candidate === "object" && candidate !== null) return Object.entries(candidate).some(([key, item]) => { candidateKeys.push(key); return protectedStrings.some((protectedValue) => key.includes(protectedValue)) || inspectStrings(item); });
+    return false;
+  };
+  const containsProtected = (candidate: string): boolean => protectedStrings.some((protectedValue) => candidate.includes(protectedValue));
+  if ([...forbiddenStructures].some((encoded) => serialized.includes(encoded)) || inspectStrings(value) || containsProtected(candidateValues.join("")) || containsProtected(candidateKeys.join(""))) throw new SkillError("skill output contains verbatim protected input content");
+}
+
+export function persistableErrorMessage(error: unknown, policy?: SkillOutputPolicy): string {
+  const message = `${error instanceof Error ? error.name : "Error"}: ${error instanceof Error ? error.message : String(error)}`;
+  try { assertOutputPolicy(message, policy); return message; }
+  catch { return "SkillError: error details rejected by output policy"; }
+}
+
 export class SkillRuntime {
   constructor(readonly workspace: Workspace, readonly registry: SkillRegistry, readonly policy: Policy, readonly tools = new ToolBroker()) {}
 
-  async run(skillId: string, payload: JsonObject, options: { changeId?: string; workspaceId?: string; approved?: boolean } = {}): Promise<SkillRun> {
-    const { manifest, packagePath } = this.registry.resolve(skillId); this.policy.checkRun(manifest, options.approved ?? false);
+  async run(skillId: string, payload: JsonObject, options: { changeId?: string; workspaceId?: string; approved?: boolean; pinned?: { version: string; digest: string }; auditInput?: JsonObject; outputPolicy?: SkillOutputPolicy } = {}): Promise<SkillRun> {
+    const { manifest, packagePath } = options.pinned ? this.registry.resolvePinned(skillId, options.pinned.version, options.pinned.digest) : this.registry.resolve(skillId); this.policy.checkRun(manifest, options.approved ?? false);
     const id = `skill-run-${randomUUID().replaceAll("-", "")}`; const startedAt = utcNow();
     try {
-      const response = parseResponse(await this.invoke(manifest, packagePath, payload));
+      const response = parseResponse(await this.invoke(manifest, packagePath, payload, options.outputPolicy?.maxBytes));
+      assertOutputPolicy(response.output, options.outputPolicy); assertOutputPolicy(response.evidence, options.outputPolicy); assertOutputPolicy(response.operations as unknown as JsonValue, options.outputPolicy);
+      const permissions = new Set(manifest.permissions); response.operations.forEach((operation) => this.tools.validate(operation, permissions));
       const toolResults: JsonObject[] = [];
-      for (const operation of response.operations) toolResults.push(await this.tools.execute(operation, new Set(manifest.permissions)));
+      for (const operation of response.operations) toolResults.push(await this.tools.execute(operation, permissions));
       const output = toolResults.length ? { ...response.output, toolResults } : response.output;
-      const run: SkillRun = { id, skillId: manifest.id, skillVersion: manifest.version, ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), status: "succeeded", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, output: redact(output) as JsonObject, evidence: redact(response.evidence) as JsonObject[] };
+      assertOutputPolicy(output, options.outputPolicy);
+      const run: SkillRun = { id, skillId: manifest.id, skillVersion: manifest.version, ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), status: "succeeded", startedAt, completedAt: utcNow(), input: redact(options.auditInput ?? payload) as JsonObject, output: redact(output) as JsonObject, evidence: redact(response.evidence) as JsonObject[] };
       this.workspace.saveRun(run); return run;
     } catch (error) {
-      const run: SkillRun = { id, skillId: manifest.id, skillVersion: manifest.version, ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), status: "failed", startedAt, completedAt: utcNow(), input: redact(payload) as JsonObject, output: {}, evidence: [], error: `${error instanceof Error ? error.name : "Error"}: ${error instanceof Error ? error.message : String(error)}` };
-      this.workspace.saveRun(run); throw error;
+      const hasProtectedInput = (options.outputPolicy?.forbiddenValues?.length ?? 0) > 0;
+      const safeError = hasProtectedInput ? "SkillError: error details rejected by output policy" : persistableErrorMessage(error, options.outputPolicy);
+      const run: SkillRun = { id, skillId: manifest.id, skillVersion: manifest.version, ...(options.changeId ? { changeId: options.changeId } : {}), ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}), status: "failed", startedAt, completedAt: utcNow(), input: redact(options.auditInput ?? payload) as JsonObject, output: {}, evidence: [], error: safeError };
+      this.workspace.saveRun(run); if (hasProtectedInput || safeError === "SkillError: error details rejected by output policy") throw new SkillError("error details rejected by output policy"); throw error;
     }
   }
 
-  private async invoke(manifest: SkillManifest, packagePath: string, payload: JsonObject): Promise<unknown> {
+  private async invoke(manifest: SkillManifest, packagePath: string, payload: JsonObject, maxBytes?: number): Promise<unknown> {
     if (manifest.entrypoint.type === "builtin") { const handler = builtins[manifest.entrypoint.target]; if (!handler) throw new SkillError(`unknown builtin skill: ${manifest.entrypoint.target}`); return handler(payload); }
     const executable = resolve(packagePath, manifest.entrypoint.target); const prefix = `${packagePath}${sep}`;
     if (!executable.startsWith(prefix) || !existsSync(executable) || lstatSync(executable).isDirectory()) throw new SkillError("process entrypoint must be a file inside its skill package");
@@ -116,11 +166,13 @@ export class SkillRuntime {
     const args = command === process.execPath || command === "python3" ? [executable] : [];
     return await new Promise((accept, reject) => {
       const child = spawn(command, args, { cwd: packagePath, env: { PATH: process.env.PATH ?? "", LANG: "C.UTF-8" }, stdio: ["pipe", "pipe", "pipe"] });
-      let stdout = ""; let stderr = ""; let settled = false;
-      const timeout = Math.min(manifest.timeoutSeconds, this.policy.processTimeoutSeconds);
-      const timer = setTimeout(() => { child.kill("SIGKILL"); if (!settled) { settled = true; reject(new SkillError(`skill timed out after ${timeout} seconds`)); } }, timeout * 1000);
-      child.stdout.setEncoding("utf8").on("data", (part: string) => { stdout += part; }); child.stderr.setEncoding("utf8").on("data", (part: string) => { stderr += part; });
-      child.on("error", (error) => { clearTimeout(timer); if (!settled) { settled = true; reject(new SkillError(`skill process failed: ${error.message}`)); } });
+      let stdout = ""; let stderr = ""; let stdoutBytes = 0; let stderrBytes = 0; let settled = false;
+      const timeout = Math.min(manifest.timeoutSeconds, this.policy.processTimeoutSeconds); const streamLimit = maxBytes ?? 1_048_576;
+      const fail = (message: string) => { if (settled) return; settled = true; clearTimeout(timer); child.kill("SIGKILL"); reject(new SkillError(message)); };
+      const timer = setTimeout(() => fail(`skill timed out after ${timeout} seconds`), timeout * 1000);
+      child.stdout.setEncoding("utf8").on("data", (part: string) => { stdoutBytes += Buffer.byteLength(part); if (stdoutBytes > streamLimit) { fail(`skill process stdout exceeds ${streamLimit} bytes`); return; } stdout += part; });
+      child.stderr.setEncoding("utf8").on("data", (part: string) => { stderrBytes += Buffer.byteLength(part); if (stderrBytes > streamLimit) { fail(`skill process stderr exceeds ${streamLimit} bytes`); return; } stderr += part; });
+      child.on("error", (error) => fail(`skill process failed: ${error.message}`));
       child.on("close", (code) => { clearTimeout(timer); if (settled) return; settled = true; if (code !== 0) return reject(new SkillError(`skill process exited ${code}: ${stderr.slice(-1000).trim()}`)); try { accept(JSON.parse(stdout) as unknown); } catch { reject(new SkillError("skill process did not return valid JSON")); } });
       child.stdin.end(JSON.stringify(payload));
     });

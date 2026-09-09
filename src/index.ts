@@ -26,6 +26,7 @@ export * from "./policy.js";
 export * from "./skills.js";
 export * from "./source-control-config.js";
 export * from "./tasks.js";
+export * from "./test-workbench.js";
 export * from "./workflows.js";
 export * from "./worktree-leases.js";
 export * from "./workspace-hub.js";

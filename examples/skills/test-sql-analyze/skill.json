@@ -1,0 +1,14 @@
+{
+  "id": "test.sql.analyze",
+  "version": "1.0.0",
+  "name": "SQL 分析",
+  "description": "依据表结构和 SQL 规范输出正确性、安全与性能分析",
+  "owner": "cjhx-quality-team",
+  "source": "internal",
+  "riskLevel": "S1",
+  "entrypoint": {"type": "builtin", "target": "test_sql_analyze"},
+  "permissions": [],
+  "tags": ["testing", "sql", "analysis"],
+  "timeoutSeconds": 30,
+  "requiresHumanConfirmation": false
+}

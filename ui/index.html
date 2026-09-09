@@ -8,6 +8,7 @@
   <title>CJHX Agile Workflow</title>
   <link rel="icon" href="/cjhx-ai.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/test-workbench.css">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -20,6 +21,7 @@
         <button class="nav-item" data-view="changes" aria-label="研发流程" title="研发流程"><span class="nav-icon">⌘</span><span>研发流程</span><span class="nav-count" id="change-count">0</span></button>
         <button class="nav-item" data-view="devops" aria-label="DevOps" title="DevOps"><span class="nav-icon">▷</span><span>DevOps</span><span class="nav-count" id="devops-count">—</span></button>
         <button class="nav-item" data-view="automations" aria-label="自动化" title="自动化"><span class="nav-icon">⟳</span><span>自动化</span><span class="nav-count" id="automation-count">0</span></button>
+        <button class="nav-item" data-view="test-workbench" aria-label="测试工作台" title="测试工作台"><span class="nav-icon">✓</span><span>测试工作台</span><span class="nav-count" id="test-workbench-count">6</span></button>
         <button class="nav-item" data-view="integrations" aria-label="集成配置" title="集成配置"><span class="nav-icon">⌁</span><span>集成配置</span><span class="nav-count" id="integration-count">0</span></button>
         <button class="nav-item" data-view="agents" aria-label="智能体" title="智能体"><span class="nav-icon">◎</span><span>智能体</span><span class="nav-count" id="agent-count">0</span></button>
         <button class="nav-item" data-view="skills" aria-label="Skills" title="Skills"><span class="nav-icon">◇</span><span>Skills</span><span class="nav-count" id="skill-count">0</span></button>
@@ -31,6 +33,7 @@
         <div id="change-list" class="change-list scrollbar"></div>
       </section>
       <footer class="sidebar-footer"><span class="health-dot"></span><span>本地控制面</span><button class="icon-button" id="theme-toggle" title="切换主题" aria-label="切换主题">◐</button></footer>
+      <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-label="调整左侧菜单宽度" aria-controls="sidebar" aria-orientation="vertical" aria-valuemin="220" aria-valuemax="480" aria-valuenow="270" tabindex="0" title="拖动调整左侧菜单宽度"></div>
     </aside>
     <main class="main">
       <header class="topbar">
