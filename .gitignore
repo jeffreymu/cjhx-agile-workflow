@@ -6,3 +6,6 @@ dist/
 .env
 *.log
 coverage/
+
+# 临时生成的架构报告
+cjhx-architecture-report.html
