@@ -9,6 +9,10 @@ CJHX Agile Workflow 是一个开放、可插拔、可治理的 **Skill-Driven Ag
 
 当前仓库提供一个可运行的 **TypeScript-first** MVP 控制面和扩展 SDK，不替代现有研发平台。核心框架、CLI、内置 Skills 和测试均使用 TypeScript；只有第三方能力仅提供 Python SDK 时，才通过语言无关的外部进程或服务协议接入。
 
+## 实验性 Pi Sandbox
+
+可通过 `--sandbox-config /绝对路径/sandbox-admin.json` 显式启用独立 Runner、Agent/Postflight 配对与权限摘要审批；默认本地执行不变。当前仅面向 Pi 单 Agent，Windows Runner 暂拒绝执行，macOS/Linux 仍需实机隔离验收。配置、UI 操作及无模型 OS 探针步骤见 [docs/SANDBOX.md](docs/SANDBOX.md)。**单元测试通过不代表真实隔离已验证。**
+
 ## 已实现
 
 - 有证据门禁的研发变更生命周期状态机；

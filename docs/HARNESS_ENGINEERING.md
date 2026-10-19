@@ -1,5 +1,33 @@
 # Harness Engineering
 
+## Isolated Postflight integration seam
+
+`CJHXFramework` accepts an optional `harnessCheckExecutor: HarnessCheckExecutor`.
+Harness still selects the fixed `npm.typecheck`, `npm.test`, or `npm.check` catalog
+command and supplies its canonical execution root, immutable rule snapshot,
+120-second timeout, and 256-KiB output budget. The injected executor is responsible
+for enforcing timeout, descendant cleanup, output limits during collection, and
+actual OS isolation. Reports record its `executorId` (an identifier, **not** proof
+of sandbox readiness). Exceptions and malformed results fail the check; they never
+retry through the host executor. Without injection, existing local execution is
+unchanged. Executor exception text is deliberately not copied into reports.
+
+The experimental `src/sandbox/` integration pairs a separate Runner for Pi and
+Postflight, compiles literal filesystem roots and model DNS hosts, and binds both
+policies and administrator config to a separate Agent approval digest. Postflight
+has no model network allowance. Git-command and tool-specific restrictions are
+rejected rather than advertised as enforced. Enable explicitly at service startup;
+see [Sandbox setup and acceptance](SANDBOX.md).
+
+The investigated upstream target is `@anthropic-ai/sandbox-runtime@0.0.80`, which
+requires Node.js >=22.12.0; the existing non-sandbox framework remains Node.js 20+.
+Its published Windows backend uses a dedicated sandbox user, WFP fencing, and
+filesystem ACLs. macOS and Windows isolation have **not** been validated by this
+integration. Windows Runner execution is blocked pending cleanup verification.
+UI configuration, approval preview and execution details distinguish configured
+isolation from real OS acceptance; a unit test or `ready` event is not acceptance.
+
+
 CJHX Harness Engineering governs task-scoped Agent execution without depending on Harness.io. It separates five concerns that must not be collapsed into a prompt:
 
 1. **Instruction** — guidance included in the Agent prompt.

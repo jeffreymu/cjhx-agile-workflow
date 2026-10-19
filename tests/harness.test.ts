@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { PolicyDenied } from "../src/errors.js";
 import { CJHXFramework } from "../src/framework.js";
-import type { HarnessRuleBundle, HarnessRuleSource } from "../src/harness.js";
+import type { HarnessRuleBundle, HarnessRuleSource, HarnessCheckExecutor } from "../src/harness.js";
 import { WorktreeLeaseService } from "../src/worktree-leases.js";
 
 function bundle(overrides: Partial<HarnessRuleBundle> = {}): HarnessRuleBundle {
@@ -28,12 +28,12 @@ function bundle(overrides: Partial<HarnessRuleBundle> = {}): HarnessRuleBundle {
   };
 }
 
-function fixture(t: test.TestContext, rule = bundle(), sources: HarnessRuleSource[] = []) {
+function fixture(t: test.TestContext, rule = bundle(), sources: HarnessRuleSource[] = [], harnessCheckExecutor?: HarnessCheckExecutor) {
   const root = mkdtempSync(resolve(tmpdir(), "cjhx-harness-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const repository = resolve(root, "repo"); mkdirSync(repository); execFileSync("git", ["init", "-b", "main", repository]); writeFileSync(resolve(repository, "cjhx.harness.json"), `${JSON.stringify(rule, null, 2)}\n`);
   writeFileSync(resolve(repository, "package.json"), JSON.stringify({ scripts: { typecheck: "node -e \"process.exit(0)\"" } }));
   const script = resolve(root, "agent.mjs"); writeFileSync(script, `if(process.argv.includes("--version")){console.log("agent 1.0");process.exit(0)} console.log(process.argv.at(-1));`); chmodSync(script, 0o700);
-  const app = new CJHXFramework(resolve(root, ".cjhx"), { harnessRuleSources: sources }); app.initialize();
+  const app = new CJHXFramework(resolve(root, ".cjhx"), { harnessRuleSources: sources, ...(harnessCheckExecutor ? { harnessCheckExecutor } : {}) }); app.initialize();
   const workspace = app.workspaceHub.addLocal({ path: repository }); const change = app.createChange("HARNESS-1", "Harness engineering", "developer", { workspaceId: workspace.id });
   const task = app.createTask({ changeId: change.id, workspaceId: workspace.id, title: "Implement governed change", status: "review", acceptanceCriteria: ["Type checking passes"] });
   return { root, repository, script, app, workspace, change, task };
@@ -105,4 +105,45 @@ test("Harness never reports compliance passed when the Agent process failed", as
 test("Harness rejects a project rule file that is a symbolic link", (t) => {
   const { app, repository, task, root } = fixture(t); unlinkSync(resolve(repository, "cjhx.harness.json")); const external = resolve(root, "external-rules.json"); writeFileSync(external, JSON.stringify(bundle())); symlinkSync(external, resolve(repository, "cjhx.harness.json"));
   assert.throws(() => app.harness.effectiveForTask(task.id), /symbolic link/i);
+});
+
+
+test("Harness injected Postflight executor receives only approved catalog requests", async (t) => {
+  const requests: import("../src/harness.js").HarnessCheckRequest[] = [];
+  const executor: HarnessCheckExecutor = { id: "isolated-test-double", async execute(request) { requests.push(request); return { exitCode: 0, stdout: "isolated check", stderr: "" }; } };
+  const { app, task, repository } = fixture(t, bundle(), [], executor);
+  const snapshot = app.harness.effectiveForTask(task.id);
+  const report = await app.harness.verifyRun("run-isolated", task.id, snapshot, "succeeded");
+  assert.equal(report.status, "passed"); assert.equal(requests.length, 1);
+  const request = requests[0]!;
+  assert.equal(request.checkId, "npm.typecheck"); assert.deepEqual(request.arguments, ["run", "typecheck"]);
+  assert.equal(request.cwd, realpathSync(repository)); assert.equal(request.timeoutMs, 120_000); assert.equal(request.outputLimit, 262_144);
+  assert.equal(request.ruleSnapshot.digest, snapshot.digest);
+  assert.equal(report.checks[0]?.executorId, executor.id);
+  assert.equal(report.checks[0]?.stdout, "isolated check");
+});
+
+test("Harness injected executor failure is fail-closed with no host fallback or credential diagnostics", async (t) => {
+  const executor: HarnessCheckExecutor = { id: "broken-isolation", async execute() { throw new Error("secret=do-not-store"); } };
+  const { app, task, repository } = fixture(t, bundle(), [], executor);
+  // If a host fallback ran, this script would succeed and leave a visible marker.
+  writeFileSync(resolve(repository, "package.json"), JSON.stringify({ scripts: { typecheck: "node -e \"require('fs').writeFileSync('HOST-FALLBACK','unsafe')\"" } }));
+  const snapshot = app.harness.effectiveForTask(task.id);
+  const report = await app.harness.verifyRun("run-failed-isolation", task.id, snapshot, "succeeded");
+  assert.equal(report.status, "failed"); assert.equal(report.checks[0]?.exitCode, -1);
+  assert.match(report.checks[0]!.stderr, /no host fallback/);
+  assert.doesNotMatch(JSON.stringify(report), /do-not-store/);
+  assert.equal(existsSync(resolve(repository, "HOST-FALLBACK")), false);
+});
+
+test("Harness rejects malformed injected executor results and caps output", async (t) => {
+  let invalid = true;
+  const executor: HarnessCheckExecutor = { id: "bounded-test-double", async execute() { return { exitCode: invalid ? Number.NaN : 7, stdout: "x".repeat(300_000), stderr: "y".repeat(300_000) }; } };
+  const { app, task } = fixture(t, bundle(), [], executor); const snapshot = app.harness.effectiveForTask(task.id);
+  let report = await app.harness.verifyRun("run-invalid", task.id, snapshot, "succeeded");
+  assert.equal(report.status, "failed"); assert.equal(report.checks[0]?.exitCode, -1);
+  invalid = false;
+  report = await app.harness.verifyRun("run-bounded", task.id, snapshot, "succeeded");
+  assert.equal(report.status, "failed"); assert.equal(report.checks[0]?.exitCode, 7);
+  assert.equal(report.checks[0]?.stdout.length, 262_144); assert.equal(report.checks[0]?.stderr.length, 262_144);
 });

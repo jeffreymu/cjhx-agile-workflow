@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { loadSandboxConfig } from "./sandbox/config.js";
 import { CJHXError } from "./errors.js";
 import { CJHXFramework } from "./framework.js";
 import type { MemoryKind, MemoryScope, MemorySourceRef } from "./memory.js";
@@ -76,7 +77,8 @@ function position(parsed: Parsed, index: number, name: string): string { const v
 function loadPayload(value: string): JsonObject { const raw = value.startsWith("@") ? readFileSync(value.slice(1), "utf8") : value.trimStart().startsWith("{") ? value : existsSync(value) ? readFileSync(value, "utf8") : value; const result = JSON.parse(raw) as unknown; if (typeof result !== "object" || result === null || Array.isArray(result)) throw new Error("payload must be a JSON object"); return result as JsonObject; }
 
 async function execute(parsed: Parsed): Promise<unknown> {
-  const app = new CJHXFramework(parsed.workspace, { policy: new Policy({ allowProcessSkills: parsed.allowProcessSkills }) });
+  const sandboxConfigPath = option(parsed, "--sandbox-config");
+  const app = new CJHXFramework(parsed.workspace, { policy: new Policy({ allowProcessSkills: parsed.allowProcessSkills }), ...(sandboxConfigPath ? { sandbox: loadSandboxConfig(sandboxConfigPath) } : {}) });
   switch (parsed.command) {
     case "init": app.initialize(); return { workspace: app.workspace.root, status: "initialized" };
     case "change-create": { const risk = option(parsed, "--risk") ?? "L1"; if (!riskLevels.includes(risk as RiskLevel)) throw new Error(`invalid risk: ${risk}`); return app.createChange(position(parsed, 0, "id"), position(parsed, 1, "title"), option(parsed, "--owner", true)!, { description: option(parsed, "--description"), riskLevel: risk as RiskLevel }); }

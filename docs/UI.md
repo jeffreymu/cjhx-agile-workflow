@@ -1,5 +1,14 @@
 # CJHX visual control surface
 
+## Experimental Sandbox display
+
+With administrator `--sandbox-config`, the existing Agent configuration page shows
+backend/platform validation limits; the one-shot Task approval includes both
+effective policies and a separate approval digest. Run details display IPC-derived
+Runner status and cleanup, never inferred from Agent stdout. There is no top-level
+Sandbox menu, policy editor or host-fallback retry. See [SANDBOX.md](SANDBOX.md) for
+setup, supported boundaries and real OS acceptance probes.
+
 The CJHX Web UI visualizes and operates the same control plane exposed by `CJHXFramework` and the CLI. It does not create a second source of truth: lifecycle state, evidence, installed Skills, and execution traces remain in the configured `.cjhx` workspace.
 
 ## Start

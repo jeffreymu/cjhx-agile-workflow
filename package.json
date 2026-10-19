@@ -1,6 +1,6 @@
 {
   "name": "cjhx-agile-workflow",
-  "version": "0.15.0",
+  "version": "0.18.0",
   "description": "TypeScript-first, skill-driven Agentic SDLC framework",
   "type": "module",
   "main": "./dist/src/index.js",
@@ -50,5 +50,8 @@
   "devDependencies": {
     "@types/node": "^24.10.0",
     "typescript": "^5.9.3"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sandbox-runtime": "0.0.80"
   }
 }
