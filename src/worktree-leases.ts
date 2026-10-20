@@ -42,7 +42,10 @@ export class WorktreeLeaseService {
   remove(id: string, options: { approved: boolean }): WorktreeLease {
     if (!options.approved) throw new PolicyDenied("worktree lease removal requires human approval"); const lease = this.get(id); if (lease.status === "removed") return lease; if (lease.status === "active" || lease.status === "provisioning") throw new PolicyDenied("active worktree leases cannot be removed"); if (!existsSync(lease.path)) { lease.status = "removed"; lease.removedAt = new Date().toISOString(); this.storage.saveWorktreeLease(lease); return lease; }
     const actual = realpathSync(lease.path); if (actual === realpathSync(lease.repositoryRoot)) throw new ValidationError("main worktree cannot be removed");
-    const registered = this.git(lease.repositoryRoot, ["worktree", "list", "--porcelain"]).split("\n").some((line) => line === `worktree ${actual}`); if (!registered) throw new ValidationError("worktree lease path is not registered");
+    const registered = this.git(lease.repositoryRoot, ["worktree", "list", "--porcelain", "-z"]).split("\0").some((field) => {
+      if (!field.startsWith("worktree ")) return false;
+      try { return realpathSync(field.slice("worktree ".length)) === actual; } catch { return false; }
+    }); if (!registered) throw new ValidationError("worktree lease path is not registered");
     const dirty = this.git(actual, ["status", "--porcelain=v1"]).trim(); if (dirty) { lease.status = "cleanup_pending"; this.storage.saveWorktreeLease(lease); throw new PolicyDenied("worktree lease has uncommitted changes and cannot be removed"); }
     this.git(lease.repositoryRoot, ["worktree", "remove", actual]); lease.status = "removed"; lease.removedAt = new Date().toISOString(); this.storage.saveWorktreeLease(lease); return lease;
   }

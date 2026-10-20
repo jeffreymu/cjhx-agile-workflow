@@ -237,12 +237,10 @@
 .test-empty-inline span { flex: 1; font-size: 11px; }
 .test-policy-banner { margin-top: 0; }
 
-.test-source-picker { display: flex; flex-wrap: wrap; gap: 9px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
-.test-step-approvals{display:grid;gap:8px}
-.test-step-approval { padding: 8px 10px; border-radius: 8px; background: var(--card); font-size: 12px; }
+.test-source-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 9px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
+.test-step-approvals{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.test-step-approval { display: block; min-width: 0; overflow-wrap: anywhere; padding: 8px 10px; border-radius: 8px; background: var(--card); font-size: 12px; }
 .test-step-approval.automatic{color:var(--muted-fg)}
-.test-step-approvals .checkbox,
-.test-step-approval { display: flex; align-items: center; gap: 5px; padding: 8px 10px; border-radius: 8px; background: var(--card); }
 .test-step-approvals .required { color: var(--warn); }
 .test-step-approvals code { overflow-wrap: anywhere; color: inherit; font-size: 11px; }
 

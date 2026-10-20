@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { assertPrivateMode } from "./platform-helpers.js";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -17,7 +18,7 @@ const criterion = { name: "发布失败率", type: "metric" as const, status: "o
 
 test("Goals are private, immutable-snapshotted, and activation-gated", (t) => {
   const { app, workspace } = fixture(t); const goal = app.goals.create({ workspaceId: workspace.id, title: "降低发布失败率", statement: "将生产发布失败率降低到 5% 以下", owner: "platform-team", successCriteria: [] }); assert.equal(goal.status, "draft"); assert.throws(() => app.goals.setStatus(goal.id, "active"), /at least one success criterion/);
-  const updated = app.goals.update(goal.id, { workspaceId: workspace.id, title: goal.title, statement: goal.statement, owner: goal.owner, priority: "high", successCriteria: [criterion], inScope: ["生产发布"], outOfScope: ["开发环境"], constraints: ["不得绕过 Harness"] }); assert.notEqual(updated.currentSnapshotDigest, goal.currentSnapshotDigest); const active = app.goals.setStatus(goal.id, "active"); assert.equal(active.status, "active"); assert.match(active.currentSnapshotDigest, /^sha256:/); assert.throws(() => app.goals.update(goal.id, { workspaceId: workspace.id, title: active.title, statement: active.statement, owner: active.owner, successCriteria: [] }), /active Goal update is missing/); assert.throws(() => app.goals.setStatus(goal.id, "achieved"), /every success criterion/); assert.equal(app.goals.snapshots(goal.id).length, 3); assert.equal(statSync(resolve(app.workspace.goalRecords, `${goal.id}.json`)).mode & 0o777, 0o600); assert.equal(statSync(app.workspace.goals).mode & 0o777, 0o700); assert.throws(() => app.goals.remove(goal.id), /only draft/);
+  const updated = app.goals.update(goal.id, { workspaceId: workspace.id, title: goal.title, statement: goal.statement, owner: goal.owner, priority: "high", successCriteria: [criterion], inScope: ["生产发布"], outOfScope: ["开发环境"], constraints: ["不得绕过 Harness"] }); assert.notEqual(updated.currentSnapshotDigest, goal.currentSnapshotDigest); const active = app.goals.setStatus(goal.id, "active"); assert.equal(active.status, "active"); assert.match(active.currentSnapshotDigest, /^sha256:/); assert.throws(() => app.goals.update(goal.id, { workspaceId: workspace.id, title: active.title, statement: active.statement, owner: active.owner, successCriteria: [] }), /active Goal update is missing/); assert.throws(() => app.goals.setStatus(goal.id, "achieved"), /every success criterion/); assert.equal(app.goals.snapshots(goal.id).length, 3); assertPrivateMode(resolve(app.workspace.goalRecords, `${goal.id}.json`), 0o600); assertPrivateMode(app.workspace.goals, 0o700); assert.throws(() => app.goals.remove(goal.id), /only draft/);
 });
 
 test("Goal validation rejects invalid calendar dates and criterion directions", (t) => {

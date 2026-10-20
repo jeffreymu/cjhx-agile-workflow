@@ -10,7 +10,30 @@ for enforcing timeout, descendant cleanup, output limits during collection, and
 actual OS isolation. Reports record its `executorId` (an identifier, **not** proof
 of sandbox readiness). Exceptions and malformed results fail the check; they never
 retry through the host executor. Without injection, existing local execution is
-unchanged. Executor exception text is deliberately not copied into reports.
+used. Executor exception text is deliberately not copied into reports.
+
+### Native Windows host execution (not isolation)
+
+On Windows, the default host Postflight executor invokes `npm-cli.js` through the
+current Node executable using argument arrays and `shell: false`, not by spawning
+`npm.cmd` or falling back to a shell. It searches beside Node and in absolute PATH
+entries, rejecting both literal and canonical npm entrypoints inside the execution
+repository (including external junctions pointing back into it). A missing npm
+runtime fails the check. Node/npm installations with a nonstandard layout must
+expose an external npm installation in an absolute PATH entry.
+
+Only the local host launcher is adapted: injected and sandbox executors still
+receive the approved catalog command unchanged. Host subprocesses receive a small
+environment allowlist, including required Windows system/temp variables, not the
+full control-plane environment. npm scripts themselves remain approved local code;
+this launcher is **not** a sandbox or a complete protection against hostile repos.
+
+Private-file tests check POSIX modes only on POSIX hosts. On Windows they check
+object type and reject links, but do **not** validate NTFS ACL confidentiality.
+Directory-link fixtures use junctions; file-link fixtures skip only Windows
+permission-denied errors when Developer Mode/administrator privileges are absent,
+explicitly noting that file-link rejection was not verified. These skips are not
+OS isolation acceptance.
 
 The experimental `src/sandbox/` integration pairs a separate Runner for Pi and
 Postflight, compiles literal filesystem roots and model DNS hosts, and binds both

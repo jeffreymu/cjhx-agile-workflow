@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { fileSymlink } from "./platform-helpers.js";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -73,6 +74,6 @@ test("credentials are redacted from audit record", async (t) => {
 
 test("skill packages with symbolic links are rejected", (t) => {
   const { temporary, app } = fixture(); t.after(() => rmSync(temporary, { recursive: true, force: true }));
-  const packagePath = resolve(temporary, "linked-skill"); cpSync(resolve(examples, "requirement-decompose"), packagePath, { recursive: true }); symlinkSync("/etc/passwd", resolve(packagePath, "escape"));
+  const packagePath = resolve(temporary, "linked-skill"); cpSync(resolve(examples, "requirement-decompose"), packagePath, { recursive: true }); const outside = resolve(temporary, "outside.txt"); writeFileSync(outside, "outside"); if (!fileSymlink(t, outside, resolve(packagePath, "escape"))) return;
   assert.throws(() => app.installSkill(packagePath), SkillError);
 });

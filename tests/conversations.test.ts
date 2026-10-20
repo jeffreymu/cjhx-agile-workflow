@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { assertPrivateMode } from "./platform-helpers.js";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -60,8 +61,8 @@ test("a task session persists and continues with bounded prior turns across agen
   const completedSecond = await waitForTurn(restored, session.id, second.id);
   assert.equal(completedSecond?.agentId, "beta");
   assert.equal(restored.getSession(session.id).turns.length, 2);
-  assert.equal(statSync(resolve(storage.agentSessions, `${session.id}.json`)).mode & 0o777, 0o600);
-  assert.equal(statSync(resolve(storage.agentTurns, session.id, "000001.json")).mode & 0o777, 0o600);
+  assertPrivateMode(resolve(storage.agentSessions, `${session.id}.json`), 0o600);
+  assertPrivateMode(resolve(storage.agentTurns, session.id, "000001.json"), 0o600);
 });
 
 test("restart fails closed an in-flight Turn even when the orphan process is still alive", async (t) => {

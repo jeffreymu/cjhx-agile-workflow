@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { assertPrivateMode } from "./platform-helpers.js";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -21,7 +22,7 @@ test("DevOps configuration tests, saves privately, restores, and redacts credent
   const remote = await gateway(t); const { workspace, tools, manager } = fixture(t);
   const result = await manager.save({ baseUrl: remote.url, authType: "bearer", credential: "top-secret", projectId: "pay", tenantId: "tenant-1", timeoutSeconds: 5 });
   assert.equal(result.configured, true); assert.equal(result.credentialConfigured, true); assert.equal("credential" in result, false); assert.equal(remote.seen[0]?.authorization, "Bearer top-secret");
-  const path = resolve(workspace.integrations, "devops.json"); assert.equal(statSync(path).mode & 0o777, 0o600); assert.match(readFileSync(path, "utf8"), /top-secret/);
+  const path = resolve(workspace.integrations, "devops.json"); assertPrivateMode(path, 0o600); assert.match(readFileSync(path, "utf8"), /top-secret/);
   tools.removeAdapter("devops"); new DevOpsIntegrationManager(workspace, tools); assert.equal(tools.hasAdapter("devops"), true);
   const removed = manager.remove(); assert.equal(removed.configured, false); assert.equal(workspace.integrationExists("devops"), false);
 });

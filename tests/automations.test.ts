@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { assertPrivateMode } from "./platform-helpers.js";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -14,7 +15,7 @@ function fixture(t: test.TestContext, withDevOps = false) {
 }
 
 test("daily repository review persists a private partial report with dependency, risk, release, and blocked task findings", async (t) => {
-  const { app, workspace, upstream } = fixture(t); const definition = app.automations.create({ name: "Daily health", workspaceId: workspace.id, enabled: false }); const run = await app.automations.run(definition.id); assert.equal(run.status, "partial"); const report = app.automations.getReport(run.reportId!); assert.equal(report.collectionStatus, "partial"); assert.equal(report.headCommitSha?.length, 40); assert.equal(report.releaseSummary.prediction.status, "unknown"); assert.ok(report.blockedTaskSummary.some((item) => item.taskId === upstream.id && item.classification === "explicitly-blocked")); assert.ok(report.findings.some((item) => item.category === "dependency")); assert.ok(report.findings.some((item) => item.category === "blocked-task")); assert.equal(report.signalSnapshotDigest, app.workspace.getAutomationSignalSnapshot(report.signalSnapshotId).digest); assert.equal(statSync(resolve(app.workspace.automationReports, `${report.id}.json`)).mode & 0o777, 0o600); assert.equal(statSync(app.workspace.automations).mode & 0o777, 0o700);
+  const { app, workspace, upstream } = fixture(t); const definition = app.automations.create({ name: "Daily health", workspaceId: workspace.id, enabled: false }); const run = await app.automations.run(definition.id); assert.equal(run.status, "partial"); const report = app.automations.getReport(run.reportId!); assert.equal(report.collectionStatus, "partial"); assert.equal(report.headCommitSha?.length, 40); assert.equal(report.releaseSummary.prediction.status, "unknown"); assert.ok(report.blockedTaskSummary.some((item) => item.taskId === upstream.id && item.classification === "explicitly-blocked")); assert.ok(report.findings.some((item) => item.category === "dependency")); assert.ok(report.findings.some((item) => item.category === "blocked-task")); assert.equal(report.signalSnapshotDigest, app.workspace.getAutomationSignalSnapshot(report.signalSnapshotId).digest); assertPrivateMode(resolve(app.workspace.automationReports, `${report.id}.json`), 0o600); assertPrivateMode(app.workspace.automations, 0o700);
 });
 
 test("review detects dependency changes and carries finding lifecycle across runs", async (t) => {

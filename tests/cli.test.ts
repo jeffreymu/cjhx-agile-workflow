@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { fileSymlink } from "./platform-helpers.js";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -12,7 +13,7 @@ const compiledCli = resolve(projectRoot, "dist/src/cli.js");
 test("CLI executes when launched through a package-manager style symlink", (t) => {
   const temporary = mkdtempSync(resolve(tmpdir(), "cjhx-cli-")); t.after(() => rmSync(temporary, { recursive: true, force: true }));
   const bin = resolve(temporary, "cjhx"); const workspace = resolve(temporary, "workspace");
-  symlinkSync(compiledCli, bin);
+  if (!fileSymlink(t, compiledCli, bin)) return;
   const result = spawnSync(process.execPath, [bin, "--workspace", workspace, "init"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /"status": "initialized"/);

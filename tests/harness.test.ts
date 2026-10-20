@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { assertPrivateMode, fileSymlink } from "./platform-helpers.js";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -53,7 +54,7 @@ test("Harness compiles enterprise and Workspace rules monotonically into a priva
   const source: HarnessRuleSource = { id: "enterprise", load: () => [enterprise] }; const { app, task } = fixture(t, bundle({ rules: [{ id: "workspace-policy", description: "Workspace cannot loosen enterprise policy", capabilities: { network: { mode: "unrestricted" }, git: { push: true } } }] }), [source]);
   const snapshot = app.harness.effectiveForTask(task.id);
   assert.equal(snapshot.effective.capabilities.network.mode, "none"); assert.equal(snapshot.effective.capabilities.git.push, false); assert.equal(snapshot.sources.length, 2); assert.match(snapshot.digest, /^sha256:[a-f0-9]{64}$/);
-  const path = resolve(app.workspace.ruleSnapshots, `${snapshot.id}.json`); assert.equal(statSync(path).mode & 0o777, 0o600); assert.equal((JSON.parse(readFileSync(path, "utf8")) as { digest: string }).digest, snapshot.digest);
+  const path = resolve(app.workspace.ruleSnapshots, `${snapshot.id}.json`); assertPrivateMode(path, 0o600); assert.equal((JSON.parse(readFileSync(path, "utf8")) as { digest: string }).digest, snapshot.digest);
 });
 
 test("Harness binds Agent approval to a rule digest and records successful postflight compliance", async (t) => {
@@ -61,7 +62,7 @@ test("Harness binds Agent approval to a rule digest and records successful postf
   assert.throws(() => app.startAgentForTask(task.id, { approved: true, approvedRuleDigest: "sha256:stale" }), /rule snapshot/i);
   const started = app.startAgentForTask(task.id, { approved: true, approvedRuleDigest: snapshot.digest }); const completed = await waitForCompliance(app, started.id);
   assert.equal(completed.status, "succeeded"); assert.equal(completed.complianceStatus, "passed"); assert.equal(completed.ruleSnapshotDigest, snapshot.digest); assert.match(completed.stdout, /Work test-first/);
-  const report = app.harness.listReports(task.id)[0]!; assert.equal(report.status, "passed"); assert.equal(report.checks[0]?.checkId, "npm.typecheck"); assert.equal(report.checks[0]?.status, "passed"); assert.equal(statSync(resolve(app.workspace.complianceReports, `${report.id}.json`)).mode & 0o777, 0o600);
+  const report = app.harness.listReports(task.id)[0]!; assert.equal(report.status, "passed"); assert.equal(report.checks[0]?.checkId, "npm.typecheck"); assert.equal(report.checks[0]?.status, "passed"); assertPrivateMode(resolve(app.workspace.complianceReports, `${report.id}.json`), 0o600);
 });
 
 test("Harness keeps Agent process success separate from compliance and blocks the Task gate", async (t) => {
@@ -103,7 +104,7 @@ test("Harness never reports compliance passed when the Agent process failed", as
 });
 
 test("Harness rejects a project rule file that is a symbolic link", (t) => {
-  const { app, repository, task, root } = fixture(t); unlinkSync(resolve(repository, "cjhx.harness.json")); const external = resolve(root, "external-rules.json"); writeFileSync(external, JSON.stringify(bundle())); symlinkSync(external, resolve(repository, "cjhx.harness.json"));
+  const { app, repository, task, root } = fixture(t); unlinkSync(resolve(repository, "cjhx.harness.json")); const external = resolve(root, "external-rules.json"); writeFileSync(external, JSON.stringify(bundle())); if (!fileSymlink(t, external, resolve(repository, "cjhx.harness.json"))) return;
   assert.throws(() => app.harness.effectiveForTask(task.id), /symbolic link/i);
 });
 

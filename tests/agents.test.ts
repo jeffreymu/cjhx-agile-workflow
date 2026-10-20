@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { assertPrivateMode } from "./platform-helpers.js";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -27,7 +28,7 @@ async function waitForRun(service: AgentService, id: string) {
 test("agent profiles test executables, persist privately, and restore the default", async (t) => {
   const { script, state, service } = fixture(t);
   const profile = await service.save({ id: "claude", name: "Claude Code", kind: "claude-code", command: process.execPath, arguments: [script, "{prompt}"], versionArguments: [script, "--version"], promptTransport: "argument", timeoutMinutes: 5, environmentKeys: [] }, { approved: true });
-  assert.equal(profile.version, "fake-agent 1.2.3"); assert.equal(profile.default, true); assert.equal(statSync(resolve(state.agents, "config.json")).mode & 0o777, 0o600);
+  assert.equal(profile.version, "fake-agent 1.2.3"); assert.equal(profile.default, true); assertPrivateMode(resolve(state.agents, "config.json"), 0o600);
   const restored = new AgentService(state, { task: () => { throw new Error("unused"); }, workspace: () => { throw new Error("unused"); } });
   assert.equal(restored.summary().defaultAgentId, "claude"); assert.equal(restored.summary().profiles[0]?.command, process.execPath);
 });
@@ -38,7 +39,7 @@ test("agent task execution requires approval and records output in the local wor
   assert.throws(() => service.startTask("task-1", { approved: false }), PolicyDenied);
   const started = service.startTask("task-1", { approved: true, instructions: "Work test-first" }); const completed = await waitForRun(service, started.id);
   assert.equal(completed.status, "succeeded"); assert.equal(completed.taskId, "task-1"); assert.equal(completed.workspaceId, "workspace-1"); assert.equal(completed.agentId, "codex");
-  assert.equal(statSync(resolve(service.storage.agentRuns, `${completed.id}.json`)).mode & 0o777, 0o600); const output = JSON.parse(completed.stdout.trim()) as { cwd: string; prompt: string }; assert.equal(realpathSync(output.cwd), realpathSync(repository)); assert.match(output.prompt, /Implement agent support/); assert.match(output.prompt, /Work test-first/);
+  assertPrivateMode(resolve(service.storage.agentRuns, `${completed.id}.json`), 0o600); const output = JSON.parse(completed.stdout.trim()) as { cwd: string; prompt: string }; assert.equal(realpathSync(output.cwd), realpathSync(repository)); assert.match(output.prompt, /Implement agent support/); assert.match(output.prompt, /Work test-first/);
 });
 
 test("trusted execution grants run once inside an isolated worktree", async (t) => {

@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { PolicyDenied, ValidationError } from "./errors.js";
 import { isRecord, utcNow } from "./models.js";
 import { fingerprintRepositoryState } from "./repository-state.js";
+import { localCheckProcess } from "./local-check-process.js";
 import type { Workspace } from "./storage.js";
 import { taskStatuses, type Task, type TaskStatus } from "./tasks.js";
 
@@ -143,5 +144,9 @@ export class HarnessService {
         return { executorId: executor.id, checkId, status: "failed", startedAt, completedAt: utcNow(), exitCode: -1, stdout: "", stderr: "Harness check executor failed; no host fallback was attempted" };
       }
     }
-    return await new Promise((accept) => { execFile(command, ["run", script], { cwd, timeout: 120_000, maxBuffer: outputLimit, encoding: "utf8", env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", LANG: process.env.LANG ?? "C.UTF-8", ...(process.env.TMPDIR ? { TMPDIR: process.env.TMPDIR } : {}) } }, (error, stdout, stderr) => { const exitCode = typeof (error as NodeJS.ErrnoException & { code?: unknown } | null)?.code === "number" ? (error as unknown as { code: number }).code : error ? 1 : 0; accept({ checkId, status: error ? "failed" : "passed", startedAt, completedAt: utcNow(), exitCode, stdout: stdout.slice(-outputLimit), stderr: `${stderr}${error && !stderr ? error.message : ""}`.slice(-outputLimit) }); }); }); }
+    let launch: ReturnType<typeof localCheckProcess>;
+    try { launch = localCheckProcess(cwd); } catch {
+      return { checkId, status: "failed", startedAt, completedAt: utcNow(), exitCode: -1, stdout: "", stderr: "Cannot locate the local npm runtime; no shell fallback was attempted" };
+    }
+    return await new Promise((accept) => { execFile(launch.command, [...launch.arguments, "run", script], { cwd, timeout: 120_000, maxBuffer: outputLimit, encoding: "utf8", shell: false, env: launch.environment }, (error, stdout, stderr) => { const exitCode = typeof (error as NodeJS.ErrnoException & { code?: unknown } | null)?.code === "number" ? (error as unknown as { code: number }).code : error ? 1 : 0; accept({ checkId, status: error ? "failed" : "passed", startedAt, completedAt: utcNow(), exitCode, stdout: stdout.slice(-outputLimit), stderr: `${stderr}${error && !stderr ? error.message : ""}`.slice(-outputLimit) }); }); }); }
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { assertPrivateMode } from "./platform-helpers.js";
 import { execFileSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -17,7 +18,7 @@ function fixture() {
 
 test("scans local CJHX packages and Agent instruction skills without following directory symlinks", (t) => {
   const { root, catalog, app, instructions, executable } = fixture(); t.after(() => rmSync(root, { recursive: true, force: true }));
-  const outside = resolve(root, "outside"); mkdirSync(outside); writeFileSync(resolve(outside, "SKILL.md"), "---\nname: outside\ndescription: must not be scanned\n---\n"); symlinkSync(outside, resolve(catalog, "linked-outside"));
+  const outside = resolve(root, "outside"); mkdirSync(outside); writeFileSync(resolve(outside, "SKILL.md"), "---\nname: outside\ndescription: must not be scanned\n---\n"); symlinkSync(outside, resolve(catalog, "linked-outside"), process.platform === "win32" ? "junction" : "dir");
   const skills = app.localSkills.scan(); assert.equal(skills.length, 2);
   const guide = skills.find((item) => item.kind === "agent-instructions"); const runtime = skills.find((item) => item.kind === "cjhx-package");
   assert.equal(guide?.name, "review-guide"); assert.equal(guide?.description, "Review changes against repository standards."); assert.equal(guide?.path, realpathSync(instructions)); assert.equal(guide?.enabled, false);
@@ -30,7 +31,7 @@ test("enables and disables discovered skills without deleting their source", asy
   app.localSkills.enable(guide.id); app.localSkills.enable(runtime.id);
   skills = app.localSkills.scan(); assert.equal(skills.every((item) => item.enabled), true); assert.equal(app.registry.list()[0]?.id, "api-test.generate");
   assert.deepEqual(app.localSkills.enabledAgentSkills(), [{ name: "review-guide", description: "Review changes against repository standards.", path: resolve(realpathSync(instructions), "SKILL.md") }]);
-  assert.equal(statSync(resolve(root, ".cjhx/local-skills.json")).mode & 0o777, 0o600);
+  assertPrivateMode(resolve(root, ".cjhx/local-skills.json"), 0o600);
   const run = await app.runSkill("api-test.generate", { operation: { method: "GET", path: "/orders" } }); assert.equal(run.status, "succeeded");
   app.localSkills.disable(guide.id); app.localSkills.disable(runtime.id); assert.equal(app.localSkills.scan().every((item) => !item.enabled), true);
   assert.equal(app.registry.list().length, 0); assert.equal(existsSync(instructions), true); assert.equal(existsSync(executable), true);
@@ -50,6 +51,13 @@ test("enabled Agent instruction skills are included in task prompts", async (t) 
   const workspace = app.workspaceHub.addLocal({ path: repository }); const change = app.createChange("SKILL-1", "Use local skill", "developer", { workspaceId: workspace.id }); const task = app.createTask({ changeId: change.id, workspaceId: workspace.id, title: "Review implementation" });
   const guide = app.localSkills.scan().find((item) => item.kind === "agent-instructions")!; app.localSkills.enable(guide.id);
   await app.agents.save({ id: "agent", name: "Agent", kind: "custom", command: process.execPath, arguments: [script, "{prompt}"], versionArguments: [script, "--version"], promptTransport: "argument", timeoutMinutes: 1 }, { approved: true });
-  const run = app.startAgentForTask(task.id, { approved: true }); await new Promise((accept) => setTimeout(accept, 80)); const completed = app.agents.getRun(run.id);
+  const run = app.startAgentForTask(task.id, { approved: true });
+  const deadline = performance.now() + 15_000;
+  let completed = app.agents.getRun(run.id);
+  while (completed.status === "running" && performance.now() < deadline) {
+    await new Promise((accept) => setTimeout(accept, 25));
+    completed = app.agents.getRun(run.id);
+  }
+  assert.equal(completed.status, "succeeded", `Agent did not succeed: ${JSON.stringify(completed)}`);
   assert.match(completed.stdout, /Enabled local CJHX Agent skills/); assert.match(completed.stdout, /review-guide/); assert.match(completed.stdout, /SKILL\.md/);
 });

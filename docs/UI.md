@@ -32,6 +32,17 @@ npm install --include=dev
 npm run ui
 ```
 
+## Checkbox layout
+
+Use a native `<input type="checkbox">` inside `label.checkbox`, followed by a
+`span.checkbox-label` containing the entire description (including inline code).
+The shared styles keep the control at 18px and the text in a shrinkable, wrapping
+column; ordinary field-label and text-input styles must not override choice rows.
+Knowledge-source and automation pickers use responsive columns; per-step approvals
+remain one row per step and reuse the same checked, disabled and focus styling.
+Keep existing names, values, default selections, `required` attributes and explicit
+approval checks unchanged. Layout never grants approval or starts execution.
+
 ## Information architecture
 
 The layout follows the quiet, content-first principles used by agent orchestration tools such as Orca:

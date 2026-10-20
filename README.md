@@ -211,6 +211,8 @@ npm run check           # 完整检查
 
 如果当前 shell 设置了 `NODE_ENV=production`，安装开发工具时需要显式使用 `npm install --include=dev`。
 
+原生 Windows 的构建通过 Node 执行 TypeScript JS 入口；默认宿主 Harness 检查通过 Node 执行仓库外的 `npm-cli.js`，不直接启动 `.cmd` 或回退 shell。需安装 npm 于 Node 同目录的标准布局，或通过绝对 PATH 提供仓库外的 npm 安装。Worktree 注册校验使用 NUL 分隔的 Git porcelain 与规范化真实路径，兼容斜杠差异、空格及 Unicode。以上是普通宿主兼容性修复，**不代表 Windows sandbox 已支持**。权限/链接测试及 NTFS ACL 的验证边界见 [Harness Engineering](docs/HARNESS_ENGINEERING.md#native-windows-host-execution-not-isolation)。
+
 ## 文档
 
 - [Web 端项目设计与开发使用指南](使用指南.md)

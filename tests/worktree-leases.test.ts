@@ -8,7 +8,7 @@ import { PolicyDenied } from "../src/errors.js";
 import { Workspace } from "../src/storage.js";
 import { WorktreeLeaseService } from "../src/worktree-leases.js";
 
-function fixture(t: test.TestContext) { const root = mkdtempSync(resolve(tmpdir(), "cjhx-worktree-lease-")); t.after(() => rmSync(root, { recursive: true, force: true })); const repository = resolve(root, "repo"); execFileSync("git", ["init", "-b", "main", repository]); writeFileSync(resolve(repository, "README.md"), "base\n"); execFileSync("git", ["-C", repository, "add", "."]); execFileSync("git", ["-C", repository, "-c", "user.name=CJHX", "-c", "user.email=cjhx@example.com", "commit", "-m", "initial"]); const storage = new Workspace(resolve(root, ".cjhx")); const service = new WorktreeLeaseService(storage, { workspace: () => ({ id: "workspace-1", kind: "local", rootPath: repository }) }); return { root, repository, storage, service }; }
+function fixture(t: test.TestContext) { const root = mkdtempSync(resolve(tmpdir(), "cjhx-worktree-lease 空格-")); t.after(() => rmSync(root, { recursive: true, force: true })); const repository = resolve(root, "repo"); execFileSync("git", ["init", "-b", "main", repository]); writeFileSync(resolve(repository, "README.md"), "base\n"); execFileSync("git", ["-C", repository, "add", "."]); execFileSync("git", ["-C", repository, "-c", "user.name=CJHX", "-c", "user.email=cjhx@example.com", "commit", "-m", "initial"]); const storage = new Workspace(resolve(root, ".cjhx")); const service = new WorktreeLeaseService(storage, { workspace: () => ({ id: "workspace-1", kind: "local", rootPath: repository }) }); return { root, repository, storage, service }; }
 
 test("write assignments receive unique managed worktree leases", (t) => {
   const { repository, service } = fixture(t); assert.throws(() => service.provision({ collaborationId: "collaboration-1", assignmentId: "assignment-1", workspaceId: "workspace-1", baseRevision: "HEAD", approved: false }), PolicyDenied);
@@ -19,6 +19,16 @@ test("write assignments receive unique managed worktree leases", (t) => {
 
 test("dirty worktrees are retained for explicit recovery", (t) => {
   const { service } = fixture(t); const lease = service.provision({ collaborationId: "collaboration-2", assignmentId: "assignment-dirty", workspaceId: "workspace-1", baseRevision: "HEAD", approved: true }); writeFileSync(resolve(lease.path, "work.ts"), "export const dirty = true;\n"); service.complete(lease.id); assert.throws(() => service.remove(lease.id, { approved: true }), /uncommitted changes/); assert.equal(service.get(lease.id).status, "cleanup_pending"); assert.equal(existsSync(lease.path), true); execFileSync("git", ["-C", lease.path, "add", "."]); execFileSync("git", ["-C", lease.path, "-c", "user.name=CJHX", "-c", "user.email=cjhx@example.com", "commit", "-m", "preserve work"]); assert.equal(service.remove(lease.id, { approved: true }).status, "removed");
+});
+
+test("worktree removal still rejects an existing but unregistered path", (t) => {
+  const { service } = fixture(t);
+  const lease = service.provision({ collaborationId: "collaboration-stale", assignmentId: "assignment-stale", workspaceId: "workspace-1", baseRevision: "HEAD", approved: true });
+  service.complete(lease.id);
+  execFileSync("git", ["-C", lease.repositoryRoot, "worktree", "remove", lease.path]);
+  execFileSync("git", ["init", "-b", "main", lease.path]);
+  assert.throws(() => service.remove(lease.id, { approved: true }), /not registered/);
+  assert.equal(existsSync(lease.path), true);
 });
 
 test("worktree lease inputs cannot select arbitrary paths or option revisions", (t) => {
